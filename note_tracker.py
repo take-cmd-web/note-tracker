@@ -93,4 +93,39 @@ def main():
 
     user = fetch_user_stats()
     articles, totals = fetch_pv_stats()
-    publish_
+    publish_map = fetch_publish_dates()
+
+    # ユーザー全体の統計
+    append_to_csv(
+        OUTPUT_DIR / 'user_stats.csv',
+        ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)'],
+        [today,
+         user.get('followerCount'),
+         user.get('followingCount'),
+         len(articles),
+         totals['total_pv'],
+         totals['total_like'],
+         totals['total_comment']]
+    )
+
+    # 記事ごとの統計（公開日を追加）
+    for a in articles:
+        key = a.get('key')
+        publish_date = publish_map.get(key, '')
+        append_to_csv(
+            OUTPUT_DIR / 'article_stats.csv',
+            ['日付', '公開日', 'タイトル', 'URL', 'PV', 'スキ数', 'コメント数'],
+            [today,
+             publish_date,
+             a.get('name'),
+             f"https://note.com/{NOTE_USERNAME}/n/{key}",
+             a.get('read_count', 0),
+             a.get('like_count', 0),
+             a.get('comment_count', 0)]
+        )
+
+    print(f'[{today}] 記録完了：{len(articles)}記事、総PV {totals["total_pv"]}、総スキ {totals["total_like"]}')
+
+
+if __name__ == '__main__':
+    main()

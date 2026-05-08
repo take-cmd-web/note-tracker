@@ -34,7 +34,6 @@ def fetch_pv_stats():
             break
         all_articles.extend(articles)
 
-        # 1ページ目のtotalを採用（全体集計値）
         if page == 1:
             totals['total_pv'] = data.get('total_pv', 0)
             totals['total_like'] = data.get('total_like', 0)
@@ -45,6 +44,30 @@ def fetch_pv_stats():
         page += 1
 
     return all_articles, totals
+
+
+def fetch_publish_dates():
+    """記事一覧APIから公開日を取得し、key→公開日の辞書を返す"""
+    publish_map = {}
+    page = 1
+    while True:
+        url = f'https://note.com/api/v2/creators/{NOTE_USERNAME}/contents?kind=note&page={page}'
+        res = requests.get(url, headers=HEADERS)
+        res.raise_for_status()
+        data = res.json().get('data', {})
+        contents = data.get('contents', [])
+        if not contents:
+            break
+        for c in contents:
+            key = c.get('key')
+            publish_at = c.get('publishAt') or c.get('publish_at')
+            if key and publish_at:
+                # ISO形式の日時から日付部分だけ抜き出す（例: 2025-05-09T12:34:56+09:00 → 2025-05-09）
+                publish_map[key] = publish_at[:10]
+        if data.get('isLastPage', True):
+            break
+        page += 1
+    return publish_map
 
 
 def fetch_user_stats():
@@ -70,35 +93,4 @@ def main():
 
     user = fetch_user_stats()
     articles, totals = fetch_pv_stats()
-
-    # ユーザー全体の統計
-    append_to_csv(
-        OUTPUT_DIR / 'user_stats.csv',
-        ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)'],
-        [today,
-         user.get('followerCount'),
-         user.get('followingCount'),
-         len(articles),
-         totals['total_pv'],
-         totals['total_like'],
-         totals['total_comment']]
-    )
-
-    # 記事ごとの統計
-    for a in articles:
-        append_to_csv(
-            OUTPUT_DIR / 'article_stats.csv',
-            ['日付', 'タイトル', 'URL', 'PV', 'スキ数', 'コメント数'],
-            [today,
-             a.get('name'),
-             f"https://note.com/{NOTE_USERNAME}/n/{a.get('key')}",
-             a.get('read_count', 0),
-             a.get('like_count', 0),
-             a.get('comment_count', 0)]
-        )
-
-    print(f'[{today}] 記録完了：{len(articles)}記事、総PV {totals["total_pv"]}、総スキ {totals["total_like"]}')
-
-
-if __name__ == '__main__':
-    main()
+    publish_

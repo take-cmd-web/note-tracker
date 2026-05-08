@@ -18,24 +18,37 @@ HEADERS = {
 
 
 def fetch_pv_stats():
+    """ダッシュボードAPIから記事統計と全体集計を取得"""
     all_articles = []
+    totals = {'total_pv': 0, 'total_like': 0, 'total_comment': 0}
     page = 1
+
     while True:
-        url = f'https://note.com/api/v3/stats/pv?filter=all&page={page}&sort=pv'
+        url = f'https://note.com/api/v1/stats/pv?filter=yearly&page={page}&sort=pv'
         res = requests.get(url, headers=HEADERS)
         res.raise_for_status()
         data = res.json().get('data', {})
+
         articles = data.get('note_stats', [])
         if not articles:
             break
         all_articles.extend(articles)
+
+        # 1ページ目のtotalを採用（全体集計値）
+        if page == 1:
+            totals['total_pv'] = data.get('total_pv', 0)
+            totals['total_like'] = data.get('total_like', 0)
+            totals['total_comment'] = data.get('total_comment', 0)
+
         if data.get('last_page', True):
             break
         page += 1
-    return all_articles
+
+    return all_articles, totals
 
 
 def fetch_user_stats():
+    """ユーザー情報（フォロワー数など）を取得"""
     url = f'https://note.com/api/v2/creators/{NOTE_USERNAME}'
     res = requests.get(url, headers=HEADERS)
     res.raise_for_status()
@@ -56,28 +69,35 @@ def main():
     today = datetime.now().strftime('%Y-%m-%d')
 
     user = fetch_user_stats()
-    articles = fetch_pv_stats()
-    total_pv = sum(a.get('read_count', 0) for a in articles)
-    total_likes = sum(a.get('like_count', 0) for a in articles)
+    articles, totals = fetch_pv_stats()
 
+    # ユーザー全体の統計
     append_to_csv(
         OUTPUT_DIR / 'user_stats.csv',
-        ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV', '総スキ数'],
-        [today, user.get('followerCount'), user.get('followingCount'),
-         len(articles), total_pv, total_likes]
+        ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)'],
+        [today,
+         user.get('followerCount'),
+         user.get('followingCount'),
+         len(articles),
+         totals['total_pv'],
+         totals['total_like'],
+         totals['total_comment']]
     )
 
+    # 記事ごとの統計
     for a in articles:
         append_to_csv(
             OUTPUT_DIR / 'article_stats.csv',
             ['日付', 'タイトル', 'URL', 'PV', 'スキ数', 'コメント数'],
-            [today, a.get('name'),
+            [today,
+             a.get('name'),
              f"https://note.com/{NOTE_USERNAME}/n/{a.get('key')}",
-             a.get('read_count', 0), a.get('like_count', 0),
+             a.get('read_count', 0),
+             a.get('like_count', 0),
              a.get('comment_count', 0)]
         )
 
-    print(f'[{today}] 記録完了：{len(articles)}記事、総PV {total_pv}')
+    print(f'[{today}] 記録完了：{len(articles)}記事、総PV {totals["total_pv"]}、総スキ {totals["total_like"]}')
 
 
 if __name__ == '__main__':

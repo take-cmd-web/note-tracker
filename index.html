@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>note Analytics Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Serif+JP:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e14;
+  --panel: #11161d;
+  --panel-2: #161c25;
+  --border: #1f2731;
+  --text: #d6dde6;
+  --text-dim: #7a8694;
+  --text-muted: #4a5563;
+  --accent: #e8c547;
+  --accent-2: #4a90d9;
+  --green: #5fb878;
+  --red: #d96565;
+  --orange: #d99550;
+  --grid: #1a2029;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+  background-image: 
+    radial-gradient(circle at 20% 0%, rgba(232, 197, 71, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 80% 100%, rgba(74, 144, 217, 0.03) 0%, transparent 40%);
+}
+
+.terminal-frame {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* Header */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+header::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 80px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+.brand-title {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.brand-subtitle {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.status-bar {
+  display: flex;
+  gap: 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.status-item { display: flex; gap: 6px; }
+.status-label { color: var(--text-muted); }
+.status-value { color: var(--text); }
+.status-live::before {
+  content: "●";
+  color: var(--green);
+  margin-right: 6px;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* KPI Grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.kpi {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.kpi::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--accent);
+}
+.kpi-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 8px;
+}
+.kpi-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.kpi-delta {
+  margin-top: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.delta-positive { color: var(--green); }
+.delta-negative { color: var(--red); }
+.delta-neutral { color: var(--text-dim); }
+.delta-period { color: var(--text-muted); font-size: 10px; }
+
+/* Layout */
+.main-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.full-width { grid-column: 1 / -1; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.panel-title {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.panel-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.panel-body { padding: 18px; }
+.chart-wrap { position: relative; height: 320px; }
+.chart-wrap-tall { position: relative; height: 380px; }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 18px;
+}
+.tab {
+  padding: 8px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  user-select: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Article Table */
+.article-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.article-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.article-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.article-table tbody tr:hover { background: var(--panel-2); }
+.article-table .num {
+  font-family: 'JetBrains Mono', monospace;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.article-table .rank {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent);
+  font-weight: 700;
+  width: 32px;
+}
+.article-table .title {
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.article-table .title a {
+  color: var(--text);
+  text-decoration: none;
+}
+.article-table .title a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.article-table .date {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* Bar in cell */
+.bar-cell {
+  position: relative;
+  min-width: 80px;
+}
+.bar-cell-bar {
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  background: var(--accent);
+  opacity: 0.3;
+  border-radius: 2px;
+}
+.bar-cell-text {
+  position: relative;
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Footer */
+footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+/* Error */
+.error {
+  background: rgba(217, 101, 101, 0.05);
+  border: 1px solid var(--red);
+  color: var(--red);
+  padding: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .terminal-frame { padding: 16px; }
+  header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kpi { padding: 12px; }
+  .kpi-value { font-size: 22px; }
+  .article-table .title { max-width: 200px; }
+}
+</style>
+</head>
+<body>
+<div class="terminal-frame">
+
+<header>
+  <div class="brand">
+    <div class="brand-title">note Analytics Terminal</div>
+    <div class="brand-subtitle">@take832 / Daily Performance Monitor</div>
+  </div>
+  <div class="status-bar">
+    <div class="status-item status-live"><span class="status-label">LIVE</span></div>
+    <div class="status-item"><span class="status-label">UPDATED</span><span class="status-value" id="lastUpdate">—</span></div>
+    <div class="status-item"><span class="status-label">RECORDS</span><span class="status-value" id="recordCount">—</span></div>
+  </div>
+</header>
+
+<!-- KPIs -->
+<div class="kpi-grid" id="kpiGrid">
+  <div class="loading" style="grid-column:1/-1;">Loading metrics…</div>
+</div>
+
+<!-- Charts Row 1 -->
+<div class="main-grid">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">フォロワー推移</div>
+      <div class="tabs" style="border:none; margin:0;">
+        <div class="tab active" data-range="all">ALL</div>
+        <div class="tab" data-range="90">90D</div>
+        <div class="tab" data-range="30">30D</div>
+        <div class="tab" data-range="7">7D</div>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="chart-wrap"><canvas id="followerChart"></canvas></div>
+    </div>
+  </div>
+  
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">日次フォロワー増減</div>
+      <div class="panel-meta">Net Δ / Day</div>
+    </div>
+    <div class="panel-body">
+      <div class="chart-wrap"><canvas id="deltaChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Row 2 -->
+<div class="main-grid">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">累計指標 (PV / スキ)</div>
+      <div class="panel-meta">Cumulative · 1Y</div>
+    </div>
+    <div class="panel-body">
+      <div class="chart-wrap"><canvas id="cumulativeChart"></canvas></div>
+    </div>
+  </div>
+  
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">エンゲージメント率</div>
+      <div class="panel-meta">Likes / PV</div>
+    </div>
+    <div class="panel-body">
+      <div class="chart-wrap"><canvas id="engagementChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Article Ranking -->
+<div class="panel" style="margin-bottom:16px;">
+  <div class="panel-header">
+    <div class="panel-title">記事ランキング</div>
+    <div class="tabs" id="articleTabs" style="border:none; margin:0;">
+      <div class="tab active" data-sort="PV">BY PV</div>
+      <div class="tab" data-sort="スキ数">BY LIKES</div>
+      <div class="tab" data-sort="engagement">BY ENGAGEMENT</div>
+    </div>
+  </div>
+  <div class="panel-body" style="padding:0;">
+    <div style="overflow-x:auto;">
+      <table class="article-table" id="articleTable">
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>タイトル</th>
+            <th style="width:100px;">公開日</th>
+            <th style="width:120px;" class="num">PV</th>
+            <th style="width:100px;" class="num">スキ</th>
+            <th style="width:80px;" class="num">エンゲージ率</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div>note.com/take832 · Personal analytics dashboard</div>
+  <div id="footerTime">—</div>
+</footer>
+
+</div>
+
+<script>
+// ============ Configuration ============
+const USER_CSV = 'user_stats.csv';
+const ARTICLE_CSV = 'article_stats.csv';
+
+const COLORS = {
+  text: '#d6dde6',
+  textDim: '#7a8694',
+  border: '#1f2731',
+  grid: '#1a2029',
+  accent: '#e8c547',
+  accent2: '#4a90d9',
+  green: '#5fb878',
+  red: '#d96565',
+  orange: '#d99550',
+};
+
+// Chart.js global defaults
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 10;
+Chart.defaults.color = COLORS.textDim;
+Chart.defaults.borderColor = COLORS.border;
+
+// ============ Helpers ============
+const fmt = n => n == null || isNaN(n) ? '—' : Number(n).toLocaleString('ja-JP');
+const fmtSigned = n => {
+  if (n == null || isNaN(n)) return '—';
+  const v = Number(n);
+  return (v >= 0 ? '+' : '') + v.toLocaleString('ja-JP');
+};
+const fmtPct = n => n == null || isNaN(n) ? '—' : (Number(n) * 100).toFixed(2) + '%';
+const fmtDate = d => d ? d.toISOString().slice(0, 10) : '—';
+const parseDate = s => s ? new Date(s + 'T00:00:00') : null;
+
+function num(v) {
+  if (v === '' || v == null) return null;
+  const n = Number(String(v).replace(/,/g, ''));
+  return isNaN(n) ? null : n;
+}
+
+// ============ State ============
+let userData = [];
+let articleData = [];
+let charts = {};
+let currentRange = 'all';
+let currentSort = 'PV';
+
+// ============ Load Data ============
+async function loadCSV(path) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(path, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: r => resolve(r.data),
+      error: err => reject(err),
+    });
+  });
+}
+
+async function init() {
+  try {
+    const [users, articles] = await Promise.all([
+      loadCSV(USER_CSV),
+      loadCSV(ARTICLE_CSV),
+    ]);
+    
+    // Normalize user data - strip BOM and use raw keys
+    userData = users.map(r => {
+      const cleaned = {};
+      for (const k in r) cleaned[k.replace(/^\ufeff/, '').trim()] = r[k];
+      return {
+        date: parseDate(cleaned['日付']),
+        followers: num(cleaned['フォロワー数']),
+        following: num(cleaned['フォロー数']),
+        articles: num(cleaned['記事数']),
+        totalPV: num(cleaned['総PV(直近1年)']),
+        totalLikes: num(cleaned['総スキ数(直近1年)']),
+        totalComments: num(cleaned['総コメント数(直近1年)']),
+      };
+    }).filter(r => r.date && r.followers != null)
+      .sort((a, b) => a.date - b.date);
+    
+    articleData = articles.map(r => {
+      const cleaned = {};
+      for (const k in r) cleaned[k.replace(/^\ufeff/, '').trim()] = r[k];
+      return {
+        snapshotDate: parseDate(cleaned['日付']),
+        publishDate: parseDate(cleaned['公開日']),
+        title: cleaned['タイトル'],
+        url: cleaned['URL'],
+        PV: num(cleaned['PV']) ?? 0,
+        'スキ数': num(cleaned['スキ数']) ?? 0,
+        'コメント数': num(cleaned['コメント数']) ?? 0,
+      };
+    }).filter(r => r.title);
+    
+    render();
+  } catch (e) {
+    document.getElementById('kpiGrid').innerHTML = 
+      `<div class="error" style="grid-column:1/-1;">Failed to load CSV: ${e.message}<br>同じフォルダに user_stats.csv / article_stats.csv を配置してください。</div>`;
+    console.error(e);
+  }
+}
+
+// ============ KPI Calculations ============
+function calcKPIs() {
+  const last = userData[userData.length - 1];
+  const prev = userData[userData.length - 2];
+  
+  // 7-day delta
+  const sevenDaysAgo = userData.find(r => 
+    last.date - r.date <= 7 * 86400000 && last.date - r.date >= 6 * 86400000
+  ) || userData[Math.max(0, userData.length - 8)];
+  
+  // 30-day delta  
+  const thirtyDaysAgo = userData[Math.max(0, userData.length - 31)];
+  
+  const dailyDelta = prev ? last.followers - prev.followers : null;
+  const weeklyDelta = sevenDaysAgo ? last.followers - sevenDaysAgo.followers : null;
+  const monthlyDelta = thirtyDaysAgo ? last.followers - thirtyDaysAgo.followers : null;
+  
+  return {
+    followers: last.followers,
+    dailyDelta,
+    weeklyDelta,
+    monthlyDelta,
+    totalPV: last.totalPV,
+    totalLikes: last.totalLikes,
+    articles: last.articles,
+    lastDate: last.date,
+  };
+}
+
+function renderKPIs() {
+  const k = calcKPIs();
+  const deltaClass = v => v == null ? 'delta-neutral' : v > 0 ? 'delta-positive' : v < 0 ? 'delta-negative' : 'delta-neutral';
+  const deltaArrow = v => v == null ? '' : v > 0 ? '▲' : v < 0 ? '▼' : '◆';
+  
+  const kpis = [
+    {
+      label: 'Followers',
+      value: fmt(k.followers),
+      deltas: [
+        { v: k.dailyDelta, period: '24H' },
+        { v: k.weeklyDelta, period: '7D' },
+      ],
+    },
+    {
+      label: 'Total PV (1Y)',
+      value: fmt(k.totalPV),
+      deltas: [{ v: null, period: '1Y累計' }],
+    },
+    {
+      label: 'Total Likes (1Y)',
+      value: fmt(k.totalLikes),
+      deltas: [{ v: null, period: '1Y累計' }],
+    },
+    {
+      label: 'Articles',
+      value: fmt(k.articles),
+      deltas: [{ v: null, period: 'Published' }],
+    },
+  ];
+  
+  const html = kpis.map(kpi => `
+    <div class="kpi">
+      <div class="kpi-label">${kpi.label}</div>
+      <div class="kpi-value">${kpi.value}</div>
+      <div class="kpi-delta">
+        ${kpi.deltas.map(d => 
+          d.v == null
+            ? `<span class="delta-period">${d.period}</span>`
+            : `<span class="${deltaClass(d.v)}">${deltaArrow(d.v)} ${fmtSigned(d.v)}</span><span class="delta-period">${d.period}</span>`
+        ).join('')}
+      </div>
+    </div>
+  `).join('');
+  
+  document.getElementById('kpiGrid').innerHTML = html;
+  document.getElementById('lastUpdate').textContent = fmtDate(k.lastDate);
+  document.getElementById('recordCount').textContent = userData.length + 'D';
+  document.getElementById('footerTime').textContent = 'GENERATED ' + new Date().toISOString().slice(0, 16).replace('T', ' ');
+}
+
+// ============ Charts ============
+function chartBaseOptions() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0a0e14',
+        borderColor: COLORS.border,
+        borderWidth: 1,
+        titleColor: COLORS.text,
+        bodyColor: COLORS.text,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 10 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 10,
+        cornerRadius: 0,
+        displayColors: true,
+        boxWidth: 8,
+        boxHeight: 8,
+      },
+    },
+    scales: {
+      x: {
+        grid: { color: COLORS.grid, drawTicks: false },
+        ticks: { color: COLORS.textDim, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+        border: { color: COLORS.border },
+      },
+      y: {
+        grid: { color: COLORS.grid, drawTicks: false },
+        ticks: { color: COLORS.textDim, callback: v => v.toLocaleString() },
+        border: { color: COLORS.border },
+      },
+    },
+  };
+}
+
+function rangedData(range) {
+  if (range === 'all') return userData;
+  const days = parseInt(range, 10);
+  const cutoff = userData[userData.length - 1].date - days * 86400000;
+  return userData.filter(r => r.date >= cutoff);
+}
+
+function renderFollowerChart() {
+  const data = rangedData(currentRange);
+  const labels = data.map(r => fmtDate(r.date));
+  const values = data.map(r => r.followers);
+  
+  if (charts.follower) charts.follower.destroy();
+  
+  const ctx = document.getElementById('followerChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 320);
+  grad.addColorStop(0, 'rgba(232, 197, 71, 0.25)');
+  grad.addColorStop(1, 'rgba(232, 197, 71, 0)');
+  
+  charts.follower = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Followers',
+        data: values,
+        borderColor: COLORS.accent,
+        backgroundColor: grad,
+        borderWidth: 2,
+        fill: true,
+        tension: 0.25,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: COLORS.accent,
+        pointHoverBorderColor: '#0a0e14',
+        pointHoverBorderWidth: 2,
+      }],
+    },
+    options: chartBaseOptions(),
+  });
+}
+
+function renderDeltaChart() {
+  // Last 30 days of daily change
+  const slice = userData.slice(-30);
+  const labels = [];
+  const values = [];
+  for (let i = 1; i < slice.length; i++) {
+    labels.push(fmtDate(slice[i].date).slice(5)); // MM-DD
+    values.push(slice[i].followers - slice[i - 1].followers);
+  }
+  
+  if (charts.delta) charts.delta.destroy();
+  
+  const ctx = document.getElementById('deltaChart').getContext('2d');
+  charts.delta = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Daily Δ',
+        data: values,
+        backgroundColor: values.map(v => v >= 0 ? 'rgba(95, 184, 120, 0.7)' : 'rgba(217, 101, 101, 0.7)'),
+        borderColor: values.map(v => v >= 0 ? COLORS.green : COLORS.red),
+        borderWidth: 1,
+      }],
+    },
+    options: { ...chartBaseOptions() },
+  });
+}
+
+function renderCumulativeChart() {
+  // Filter only rows that have totalPV
+  const filtered = userData.filter(r => r.totalPV != null);
+  if (filtered.length === 0) {
+    document.getElementById('cumulativeChart').parentElement.innerHTML = 
+      '<div class="loading">PV / スキ累計データはまだ記録がありません</div>';
+    return;
+  }
+  const labels = filtered.map(r => fmtDate(r.date));
+  
+  if (charts.cumulative) charts.cumulative.destroy();
+  
+  const ctx = document.getElementById('cumulativeChart').getContext('2d');
+  charts.cumulative = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '総PV',
+          data: filtered.map(r => r.totalPV),
+          borderColor: COLORS.accent2,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          yAxisID: 'y',
+        },
+        {
+          label: '総スキ数',
+          data: filtered.map(r => r.totalLikes),
+          borderColor: COLORS.orange,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          yAxisID: 'y1',
+        },
+      ],
+    },
+    options: {
+      ...chartBaseOptions(),
+      plugins: {
+        ...chartBaseOptions().plugins,
+        legend: {
+          display: true,
+          position: 'top',
+          align: 'end',
+          labels: {
+            color: COLORS.textDim,
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            usePointStyle: true,
+            pointStyle: 'rect',
+            boxWidth: 8,
+            boxHeight: 8,
+          },
+        },
+      },
+      scales: {
+        ...chartBaseOptions().scales,
+        y: {
+          ...chartBaseOptions().scales.y,
+          position: 'left',
+          title: { display: true, text: 'PV', color: COLORS.accent2, font: { size: 10 } },
+        },
+        y1: {
+          grid: { drawOnChartArea: false, color: COLORS.grid },
+          ticks: { color: COLORS.textDim, callback: v => v.toLocaleString() },
+          border: { color: COLORS.border },
+          position: 'right',
+          title: { display: true, text: 'Likes', color: COLORS.orange, font: { size: 10 } },
+        },
+      },
+    },
+  });
+}
+
+function renderEngagementChart() {
+  // Engagement = total likes / total PV * 100, computed daily
+  const filtered = userData.filter(r => r.totalPV != null && r.totalLikes != null && r.totalPV > 0);
+  if (filtered.length === 0) {
+    document.getElementById('engagementChart').parentElement.innerHTML = 
+      '<div class="loading">エンゲージメント計算用データがまだありません</div>';
+    return;
+  }
+  const labels = filtered.map(r => fmtDate(r.date));
+  const values = filtered.map(r => (r.totalLikes / r.totalPV) * 100);
+  
+  if (charts.engagement) charts.engagement.destroy();
+  
+  const ctx = document.getElementById('engagementChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 320);
+  grad.addColorStop(0, 'rgba(74, 144, 217, 0.20)');
+  grad.addColorStop(1, 'rgba(74, 144, 217, 0)');
+  
+  charts.engagement = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Engagement %',
+        data: values,
+        borderColor: COLORS.accent2,
+        backgroundColor: grad,
+        borderWidth: 2,
+        fill: true,
+        tension: 0.25,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+      }],
+    },
+    options: {
+      ...chartBaseOptions(),
+      scales: {
+        ...chartBaseOptions().scales,
+        y: {
+          ...chartBaseOptions().scales.y,
+          ticks: { 
+            color: COLORS.textDim, 
+            callback: v => v.toFixed(2) + '%',
+          },
+        },
+      },
+    },
+  });
+}
+
+// ============ Article Ranking ============
+function renderArticleTable() {
+  // Use latest snapshot
+  if (articleData.length === 0) return;
+  const latestDate = articleData.reduce((a, b) => a.snapshotDate > b.snapshotDate ? a : b).snapshotDate;
+  let rows = articleData.filter(r => r.snapshotDate.getTime() === latestDate.getTime());
+  
+  rows = rows.map(r => ({
+    ...r,
+    engagement: r.PV > 0 ? r['スキ数'] / r.PV : 0,
+  }));
+  
+  rows.sort((a, b) => b[currentSort] - a[currentSort]);
+  rows = rows.slice(0, 20);
+  
+  const maxPV = Math.max(...rows.map(r => r.PV));
+  const maxLike = Math.max(...rows.map(r => r['スキ数']));
+  
+  const tbody = document.querySelector('#articleTable tbody');
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td class="rank">${String(i + 1).padStart(2, '0')}</td>
+      <td class="title"><a href="${r.url}" target="_blank" rel="noopener">${escapeHTML(r.title)}</a></td>
+      <td class="date">${fmtDate(r.publishDate)}</td>
+      <td class="num">
+        <div class="bar-cell">
+          <div class="bar-cell-bar" style="width:${(r.PV / maxPV) * 100}%;"></div>
+          <div class="bar-cell-text">${fmt(r.PV)}</div>
+        </div>
+      </td>
+      <td class="num">
+        <div class="bar-cell">
+          <div class="bar-cell-bar" style="width:${(r['スキ数'] / maxLike) * 100}%; background:${COLORS.orange};"></div>
+          <div class="bar-cell-text">${fmt(r['スキ数'])}</div>
+        </div>
+      </td>
+      <td class="num">${(r.engagement * 100).toFixed(2)}%</td>
+    </tr>
+  `).join('');
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+// ============ Render All ============
+function render() {
+  renderKPIs();
+  renderFollowerChart();
+  renderDeltaChart();
+  renderCumulativeChart();
+  renderEngagementChart();
+  renderArticleTable();
+}
+
+// ============ Event Handlers ============
+document.querySelectorAll('.tab[data-range]').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab[data-range]').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentRange = tab.dataset.range;
+    renderFollowerChart();
+  });
+});
+
+document.querySelectorAll('#articleTabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#articleTabs .tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentSort = tab.dataset.sort;
+    renderArticleTable();
+  });
+});
+
+// Init
+init();
+</script>
+</body>
+</html>

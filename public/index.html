@@ -540,6 +540,7 @@ async function init() {
       for (const k in r) cleaned[k.replace(/^\ufeff/, '').trim()] = r[k];
       return {
         snapshotDate: parseDate(cleaned['日付']),
+        snapshotDateStr: (cleaned['日付'] || '').trim(),
         publishDate: parseDate(cleaned['公開日']),
         title: cleaned['タイトル'],
         url: cleaned['URL'],
@@ -877,10 +878,10 @@ function renderEngagementChart() {
 
 // ============ Article Ranking ============
 function renderArticleTable() {
-  // Use latest snapshot
+  // Use latest snapshot (string comparison to avoid timezone issues)
   if (articleData.length === 0) return;
-  const latestDate = articleData.reduce((a, b) => a.snapshotDate > b.snapshotDate ? a : b).snapshotDate;
-  let rows = articleData.filter(r => r.snapshotDate.getTime() === latestDate.getTime());
+  const latestDateStr = articleData.reduce((a, b) => a.snapshotDateStr > b.snapshotDateStr ? a : b).snapshotDateStr;
+  let rows = articleData.filter(r => r.snapshotDateStr === latestDateStr);
   
   rows = rows.map(r => ({
     ...r,

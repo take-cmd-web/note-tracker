@@ -7,7 +7,7 @@ from pathlib import Path
 # ===== 環境変数から読み込み =====
 NOTE_USERNAME = os.environ['NOTE_USERNAME']
 COOKIE = os.environ['NOTE_COOKIE']
-OUTPUT_DIR = Path('./note_stats')
+OUTPUT_DIR = Path('./public')
 
 HEADERS = {
     'Cookie': COOKIE,

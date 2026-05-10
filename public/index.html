@@ -777,6 +777,16 @@ function movingAvg(arr, window) {
   });
 }
 
+// 前日までのwindow日平均（最新の1点のみ非表示）
+function movingAvgLagged(arr, window) {
+  return arr.map((v, i) => {
+    if (i === arr.length - 1) return null; // 最新日は表示しない
+    const start = Math.max(0, i - window + 1);
+    const slice = arr.slice(start, i + 1);
+    return slice.reduce((s, v) => s + v, 0) / slice.length;
+  });
+}
+
 function renderDeltaChart() {
   const slice = userData.slice(-31); // 30日分のΔ + 移動平均用に1日余分
   const labels = [];
@@ -1025,7 +1035,7 @@ function renderArticlePVChart() {
   const pvData = rows.map(r => r.PV);
   const likeData = rows.map(r => r['スキ数']);
   const titles = rows.map(r => r.title);
-  const pvMA7 = movingAvg(pvData, 7);
+  const pvMA7 = movingAvgLagged(pvData, 7);
 
   if (charts.articlePV) charts.articlePV.destroy();
 

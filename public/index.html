@@ -560,12 +560,14 @@ async function init() {
     }).filter(r => r.date && r.followers != null)
       .sort((a, b) => a.date - b.date);
     
-    articleData = articles.map(r => {
+    // \r\n 対策: 全値から \r を除去してキーを正規化
+    const cleanStr = v => (v || '').replace(/\r/g, '').trim();
+
+    const rawArticles = articles.map(r => {
       const cleaned = {};
-      for (const k in r) cleaned[k.replace(/^\ufeff/, '').trim()] = r[k];
+      for (const k in r) cleaned[cleanStr(k).replace(/^\ufeff/, '')] = cleanStr(r[k]);
       return {
-        snapshotDate: parseDate(cleaned['日付']),
-        snapshotDateStr: (cleaned['日付'] || '').trim(),
+        snapshotDateStr: cleaned['日付'],
         publishDate: parseDate(cleaned['公開日']),
         title: cleaned['タイトル'],
         url: cleaned['URL'],
@@ -573,7 +575,20 @@ async function init() {
         'スキ数': num(cleaned['スキ数']) ?? 0,
         'コメント数': num(cleaned['コメント数']) ?? 0,
       };
-    }).filter(r => r.title);
+    }).filter(r => r.title && r.snapshotDateStr);
+
+    // 最新スナップショット日を特定
+    const latestSnap = rawArticles.reduce((a, b) => a.snapshotDateStr > b.snapshotDateStr ? a : b).snapshotDateStr;
+
+    // 最新日のみ絞り込み → URLで重複除去(同URLが複数あれば最初の1件のみ)
+    const seen = new Set();
+    articleData = rawArticles
+      .filter(r => r.snapshotDateStr === latestSnap)
+      .filter(r => {
+        if (seen.has(r.url)) return false;
+        seen.add(r.url);
+        return true;
+      });
     
     render();
   } catch (e) {
@@ -903,16 +918,11 @@ function renderEngagementChart() {
 
 // ============ Article Ranking ============
 function renderArticleTable() {
-  // Use latest snapshot (string comparison to avoid timezone issues)
   if (articleData.length === 0) return;
-  const latestDateStr = articleData.reduce((a, b) => a.snapshotDateStr > b.snapshotDateStr ? a : b).snapshotDateStr;
-  let rows = articleData.filter(r => r.snapshotDateStr === latestDateStr);
-  
-  rows = rows.map(r => ({
+  let rows = articleData.map(r => ({
     ...r,
     engagement: r.PV > 0 ? r['スキ数'] / r.PV : 0,
   }));
-  
   rows.sort((a, b) => b[currentSort] - a[currentSort]);
   rows = rows.slice(0, 20);
   
@@ -945,12 +955,11 @@ function renderArticleTable() {
 // ============ Article by Date ============
 function renderArticleByDate() {
   if (articleData.length === 0) return;
-  const latestDateStr = articleData.reduce((a, b) => a.snapshotDateStr > b.snapshotDateStr ? a : b).snapshotDateStr;
   let rows = articleData
-    .filter(r => r.snapshotDateStr === latestDateStr)
     .map(r => ({ ...r, engagement: r.PV > 0 ? r['スキ数'] / r.PV : 0 }))
     .filter(r => r.publishDate)
-    .sort((a, b) => b.publishDate - a.publishDate);
+    .sort((a, b) => b.publishDate - a.publishDate)
+    .slice(0, 20);
 
   const maxPV = Math.max(...rows.map(r => r.PV));
   const maxLike = Math.max(...rows.map(r => r['スキ数']));

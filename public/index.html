@@ -419,7 +419,7 @@ footer {
 <!-- Article PV Bar Chart -->
 <div class="panel" style="margin-bottom:16px;">
   <div class="panel-header">
-    <div class="panel-title">記事別 PV（直近1ヶ月）</div>
+    <div class="panel-title">記事別 PV（直近2ヶ月）</div>
     <div class="panel-meta">BY PUBLISH DATE</div>
   </div>
   <div class="panel-body">
@@ -769,32 +769,72 @@ function renderFollowerChart() {
   });
 }
 
+function movingAvg(arr, window) {
+  return arr.map((_, i) => {
+    const start = Math.max(0, i - window + 1);
+    const slice = arr.slice(start, i + 1);
+    return slice.reduce((s, v) => s + v, 0) / slice.length;
+  });
+}
+
 function renderDeltaChart() {
-  // Last 30 days of daily change
-  const slice = userData.slice(-30);
+  const slice = userData.slice(-31); // 30日分のΔ + 移動平均用に1日余分
   const labels = [];
   const values = [];
   for (let i = 1; i < slice.length; i++) {
-    labels.push(fmtDate(slice[i].date).slice(5)); // MM-DD
+    labels.push(fmtDate(slice[i].date).slice(5));
     values.push(slice[i].followers - slice[i - 1].followers);
   }
-  
+  const ma7 = movingAvg(values, 7);
+
   if (charts.delta) charts.delta.destroy();
-  
+
   const ctx = document.getElementById('deltaChart').getContext('2d');
   charts.delta = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
-      datasets: [{
-        label: 'Daily Δ',
-        data: values,
-        backgroundColor: values.map(v => v >= 0 ? 'rgba(95, 184, 120, 0.7)' : 'rgba(217, 101, 101, 0.7)'),
-        borderColor: values.map(v => v >= 0 ? COLORS.green : COLORS.red),
-        borderWidth: 1,
-      }],
+      datasets: [
+        {
+          label: 'Daily Δ',
+          data: values,
+          backgroundColor: values.map(v => v >= 0 ? 'rgba(95, 184, 120, 0.7)' : 'rgba(217, 101, 101, 0.7)'),
+          borderColor: values.map(v => v >= 0 ? COLORS.green : COLORS.red),
+          borderWidth: 1,
+          order: 2,
+        },
+        {
+          label: '7日移動平均',
+          data: ma7,
+          type: 'line',
+          borderColor: COLORS.accent,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          order: 1,
+        },
+      ],
     },
-    options: { ...chartBaseOptions() },
+    options: {
+      ...chartBaseOptions(),
+      plugins: {
+        ...chartBaseOptions().plugins,
+        legend: {
+          display: true,
+          position: 'top',
+          align: 'end',
+          labels: {
+            color: COLORS.textDim,
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            usePointStyle: true,
+            pointStyle: 'rect',
+            boxWidth: 8, boxHeight: 8,
+          },
+        },
+      },
+    },
   });
 }
 
@@ -967,9 +1007,9 @@ function renderArticleTable() {
 function renderArticlePVChart() {
   if (articleData.length === 0) return;
 
-  // 直近30日以内に公開された記事を公開日昇順で取得
+  // 直近60日以内に公開された記事を公開日昇順で取得
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 30);
+  cutoff.setDate(cutoff.getDate() - 60);
 
   const rows = articleData
     .filter(r => r.publishDate && r.publishDate >= cutoff)
@@ -977,14 +1017,15 @@ function renderArticlePVChart() {
 
   if (rows.length === 0) {
     document.getElementById('articlePVChart').parentElement.innerHTML =
-      '<div class="loading">直近1ヶ月に公開された記事がありません</div>';
+      '<div class="loading">直近2ヶ月に公開された記事がありません</div>';
     return;
   }
 
-  const labels = rows.map(r => fmtDate(r.publishDate).slice(5)); // MM-DD
+  const labels = rows.map(r => fmtDate(r.publishDate).slice(5));
   const pvData = rows.map(r => r.PV);
   const likeData = rows.map(r => r['スキ数']);
   const titles = rows.map(r => r.title);
+  const pvMA7 = movingAvg(pvData, 7);
 
   if (charts.articlePV) charts.articlePV.destroy();
 
@@ -997,18 +1038,33 @@ function renderArticlePVChart() {
         {
           label: 'PV',
           data: pvData,
-          backgroundColor: 'rgba(232, 197, 71, 0.7)',
+          backgroundColor: 'rgba(232, 197, 71, 0.6)',
           borderColor: COLORS.accent,
           borderWidth: 1,
           yAxisID: 'y',
+          order: 3,
         },
         {
           label: 'スキ',
           data: likeData,
-          backgroundColor: 'rgba(217, 149, 80, 0.7)',
+          backgroundColor: 'rgba(217, 149, 80, 0.6)',
           borderColor: COLORS.orange,
           borderWidth: 1,
           yAxisID: 'y1',
+          order: 4,
+        },
+        {
+          label: 'PV 7日MA',
+          data: pvMA7,
+          type: 'line',
+          borderColor: '#5fb8d4',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          yAxisID: 'y',
+          order: 1,
         },
       ],
     },
@@ -1025,27 +1081,21 @@ function renderArticlePVChart() {
             font: { family: "'JetBrains Mono', monospace", size: 10 },
             usePointStyle: true,
             pointStyle: 'rect',
-            boxWidth: 8,
-            boxHeight: 8,
+            boxWidth: 8, boxHeight: 8,
           },
         },
         tooltip: {
           ...chartBaseOptions().plugins.tooltip,
           callbacks: {
             title: (items) => titles[items[0].dataIndex],
-            label: (item) => ` ${item.dataset.label}: ${item.raw.toLocaleString()}`,
+            label: (item) => ` ${item.dataset.label}: ${typeof item.raw === 'number' ? item.raw.toFixed(item.dataset.label.includes('MA') ? 1 : 0) : item.raw}`,
           },
         },
       },
       scales: {
         x: {
           ...chartBaseOptions().scales.x,
-          ticks: {
-            color: COLORS.textDim,
-            maxRotation: 45,
-            autoSkip: true,
-            maxTicksLimit: 20,
-          },
+          ticks: { color: COLORS.textDim, maxRotation: 45, autoSkip: true, maxTicksLimit: 25 },
         },
         y: {
           ...chartBaseOptions().scales.y,

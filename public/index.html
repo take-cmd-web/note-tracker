@@ -416,6 +416,31 @@ footer {
   </div>
 </div>
 
+<!-- Article by Date -->
+<div class="panel" style="margin-bottom:16px;">
+  <div class="panel-header">
+    <div class="panel-title">記事一覧 <span style="font-size:11px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; font-weight:400;">新しい順</span></div>
+    <div class="panel-meta">LATEST FIRST</div>
+  </div>
+  <div class="panel-body" style="padding:0;">
+    <div style="overflow-x:auto;">
+      <table class="article-table" id="articleByDateTable">
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>タイトル</th>
+            <th style="width:100px;">公開日</th>
+            <th style="width:120px;" class="num">PV</th>
+            <th style="width:100px;" class="num">スキ</th>
+            <th style="width:80px;" class="num">エンゲージ率</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- Article Ranking -->
 <div class="panel" style="margin-bottom:16px;">
   <div class="panel-header">
@@ -917,6 +942,42 @@ function renderArticleTable() {
   `).join('');
 }
 
+// ============ Article by Date ============
+function renderArticleByDate() {
+  if (articleData.length === 0) return;
+  const latestDateStr = articleData.reduce((a, b) => a.snapshotDateStr > b.snapshotDateStr ? a : b).snapshotDateStr;
+  let rows = articleData
+    .filter(r => r.snapshotDateStr === latestDateStr)
+    .map(r => ({ ...r, engagement: r.PV > 0 ? r['スキ数'] / r.PV : 0 }))
+    .filter(r => r.publishDate)
+    .sort((a, b) => b.publishDate - a.publishDate);
+
+  const maxPV = Math.max(...rows.map(r => r.PV));
+  const maxLike = Math.max(...rows.map(r => r['スキ数']));
+
+  const tbody = document.querySelector('#articleByDateTable tbody');
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td class="rank">${String(i + 1).padStart(2, '0')}</td>
+      <td class="title"><a href="${r.url}" target="_blank" rel="noopener">${escapeHTML(r.title)}</a></td>
+      <td class="date">${fmtDate(r.publishDate)}</td>
+      <td class="num">
+        <div class="bar-cell">
+          <div class="bar-cell-bar" style="width:${(r.PV / maxPV) * 100}%;"></div>
+          <div class="bar-cell-text">${fmt(r.PV)}</div>
+        </div>
+      </td>
+      <td class="num">
+        <div class="bar-cell">
+          <div class="bar-cell-bar" style="width:${maxLike > 0 ? (r['スキ数'] / maxLike) * 100 : 0}%; background:${COLORS.orange};"></div>
+          <div class="bar-cell-text">${fmt(r['スキ数'])}</div>
+        </div>
+      </td>
+      <td class="num">${(r.engagement * 100).toFixed(2)}%</td>
+    </tr>
+  `).join('');
+}
+
 function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -930,6 +991,7 @@ function render() {
   renderDeltaChart();
   renderCumulativeChart();
   renderEngagementChart();
+  renderArticleByDate();
   renderArticleTable();
 }
 

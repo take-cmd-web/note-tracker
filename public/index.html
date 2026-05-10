@@ -416,6 +416,17 @@ footer {
   </div>
 </div>
 
+<!-- Article PV Bar Chart -->
+<div class="panel" style="margin-bottom:16px;">
+  <div class="panel-header">
+    <div class="panel-title">記事別 PV（直近1ヶ月）</div>
+    <div class="panel-meta">BY PUBLISH DATE</div>
+  </div>
+  <div class="panel-body">
+    <div style="position:relative; height:320px;"><canvas id="articlePVChart"></canvas></div>
+  </div>
+</div>
+
 <!-- Article by Date -->
 <div class="panel" style="margin-bottom:16px;">
   <div class="panel-header">
@@ -952,6 +963,107 @@ function renderArticleTable() {
   `).join('');
 }
 
+// ============ Article PV Bar Chart ============
+function renderArticlePVChart() {
+  if (articleData.length === 0) return;
+
+  // 直近30日以内に公開された記事を公開日昇順で取得
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+
+  const rows = articleData
+    .filter(r => r.publishDate && r.publishDate >= cutoff)
+    .sort((a, b) => a.publishDate - b.publishDate);
+
+  if (rows.length === 0) {
+    document.getElementById('articlePVChart').parentElement.innerHTML =
+      '<div class="loading">直近1ヶ月に公開された記事がありません</div>';
+    return;
+  }
+
+  const labels = rows.map(r => fmtDate(r.publishDate).slice(5)); // MM-DD
+  const pvData = rows.map(r => r.PV);
+  const likeData = rows.map(r => r['スキ数']);
+  const titles = rows.map(r => r.title);
+
+  if (charts.articlePV) charts.articlePV.destroy();
+
+  const ctx = document.getElementById('articlePVChart').getContext('2d');
+  charts.articlePV = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'PV',
+          data: pvData,
+          backgroundColor: 'rgba(232, 197, 71, 0.7)',
+          borderColor: COLORS.accent,
+          borderWidth: 1,
+          yAxisID: 'y',
+        },
+        {
+          label: 'スキ',
+          data: likeData,
+          backgroundColor: 'rgba(217, 149, 80, 0.7)',
+          borderColor: COLORS.orange,
+          borderWidth: 1,
+          yAxisID: 'y1',
+        },
+      ],
+    },
+    options: {
+      ...chartBaseOptions(),
+      plugins: {
+        ...chartBaseOptions().plugins,
+        legend: {
+          display: true,
+          position: 'top',
+          align: 'end',
+          labels: {
+            color: COLORS.textDim,
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            usePointStyle: true,
+            pointStyle: 'rect',
+            boxWidth: 8,
+            boxHeight: 8,
+          },
+        },
+        tooltip: {
+          ...chartBaseOptions().plugins.tooltip,
+          callbacks: {
+            title: (items) => titles[items[0].dataIndex],
+            label: (item) => ` ${item.dataset.label}: ${item.raw.toLocaleString()}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          ...chartBaseOptions().scales.x,
+          ticks: {
+            color: COLORS.textDim,
+            maxRotation: 45,
+            autoSkip: true,
+            maxTicksLimit: 20,
+          },
+        },
+        y: {
+          ...chartBaseOptions().scales.y,
+          position: 'left',
+          title: { display: true, text: 'PV', color: COLORS.accent, font: { size: 10 } },
+        },
+        y1: {
+          grid: { drawOnChartArea: false, color: COLORS.grid },
+          ticks: { color: COLORS.textDim, callback: v => v.toLocaleString() },
+          border: { color: COLORS.border },
+          position: 'right',
+          title: { display: true, text: 'スキ', color: COLORS.orange, font: { size: 10 } },
+        },
+      },
+    },
+  });
+}
+
 // ============ Article by Date ============
 function renderArticleByDate() {
   if (articleData.length === 0) return;
@@ -1000,6 +1112,7 @@ function render() {
   renderDeltaChart();
   renderCumulativeChart();
   renderEngagementChart();
+  renderArticlePVChart();
   renderArticleByDate();
   renderArticleTable();
 }

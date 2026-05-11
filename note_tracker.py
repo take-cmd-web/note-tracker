@@ -4,12 +4,11 @@ import os
 import json
 import io
 import re
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
-# google-auth と google-api-python-client が必要
-# pip install google-auth google-api-python-client
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -18,9 +17,6 @@ from googleapiclient.http import MediaIoBaseUpload
 NOTE_USERNAME = os.environ['NOTE_USERNAME']
 COOKIE = os.environ['NOTE_COOKIE']
 
-# Google Drive 用（GitHub Actions の Secrets に設定）
-# GOOGLE_SERVICE_ACCOUNT_JSON : サービスアカウントの JSON キー全体を文字列として格納
-# GOOGLE_DRIVE_FOLDER_ID      : アップロード先フォルダの ID（共有設定でサービスアカウントに編集権限を付与すること）
 GOOGLE_SERVICE_ACCOUNT_JSON = os.environ['GOOGLE_SERVICE_ACCOUNT_JSON']
 GOOGLE_DRIVE_FOLDER_ID = os.environ['GOOGLE_DRIVE_FOLDER_ID']
 
@@ -41,14 +37,12 @@ DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive']
 # ──────────────────────────────────────────────
 
 def build_drive_service():
-    """サービスアカウント JSON からDriveクライアントを生成"""
     info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
     creds = service_account.Credentials.from_service_account_info(info, scopes=DRIVE_SCOPES)
     return build('drive', 'v3', credentials=creds)
 
 
 def get_or_create_file_id(service, filename: str, folder_id: str) -> str | None:
-    """フォルダ内に同名ファイルがあれば ID を返し、なければ None を返す"""
     query = (
         f"name = '{filename}' "
         f"and '{folder_id}' in parents "
@@ -61,10 +55,6 @@ def get_or_create_file_id(service, filename: str, folder_id: str) -> str | None:
 
 
 def upload_csv_to_drive(service, local_path: Path, folder_id: str):
-    """
-    ローカルの CSV を Google Drive の指定フォルダへアップロード。
-    同名ファイルが既にある場合は上書き（update）、なければ新規作成（create）。
-    """
     filename = local_path.name
     content = local_path.read_bytes()
     media = MediaIoBaseUpload(io.BytesIO(content), mimetype='text/csv', resumable=False)
@@ -72,22 +62,47 @@ def upload_csv_to_drive(service, local_path: Path, folder_id: str):
     file_id = get_or_create_file_id(service, filename, folder_id)
 
     if file_id:
-        # 既存ファイルを上書き（メタデータは変更しない）
         service.files().update(fileId=file_id, media_body=media).execute()
         print(f'  [Drive] 更新: {filename} (id={file_id})')
     else:
-        # 新規作成
         metadata = {'name': filename, 'parents': [folder_id]}
         service.files().create(body=metadata, media_body=media, fields='id').execute()
         print(f'  [Drive] 新規作成: {filename}')
 
 
 # ──────────────────────────────────────────────
-# note API
+# note API（認証チェック付き）
 # ──────────────────────────────────────────────
 
+def check_auth():
+    """
+    セッションCookieの有効性を確認する。
+    無効な場合はエラーメッセージを出して終了する。
+    """
+    url = f'https://note.com/api/v1/stats/pv?filter=yearly&page=1&sort=pv'
+    res = requests.get(url, headers=HEADERS)
+
+    if res.status_code == 401:
+        print('::error::認証エラー（401）: NOTE_COOKIEが失効しています。GitHubのSecretsを更新してください。')
+        sys.exit(1)
+
+    if res.status_code == 403:
+        print('::error::アクセス拒否（403）: NOTE_COOKIEが無効です。GitHubのSecretsを更新してください。')
+        sys.exit(1)
+
+    if res.status_code != 200:
+        print(f'::error::APIエラー（{res.status_code}）: {res.text[:200]}')
+        sys.exit(1)
+
+    data = res.json().get('data', {})
+    if not data.get('note_stats') and data.get('total_pv', 0) == 0:
+        print('::error::データが取得できませんでした。NOTE_COOKIEが失効している可能性があります。')
+        sys.exit(1)
+
+    print('認証OK: Cookieは有効です。')
+
+
 def fetch_pv_stats():
-    """ダッシュボードAPIから記事統計と全体集計を取得"""
     all_articles = []
     totals = {'total_pv': 0, 'total_like': 0, 'total_comment': 0}
     page = 1
@@ -116,7 +131,6 @@ def fetch_pv_stats():
 
 
 def fetch_publish_dates():
-    """記事一覧APIから公開日を取得し、key→公開日の辞書を返す"""
     publish_map = {}
     page = 1
     while True:
@@ -139,7 +153,6 @@ def fetch_publish_dates():
 
 
 def fetch_user_stats():
-    """ユーザー情報（フォロワー数など）を取得"""
     url = f'https://note.com/api/v2/creators/{NOTE_USERNAME}'
     res = requests.get(url, headers=HEADERS)
     res.raise_for_status()
@@ -147,13 +160,11 @@ def fetch_user_stats():
 
 
 def fetch_char_count(key: str) -> int:
-    """記事詳細APIから本文テキストを取得し文字数を返す（取得失敗時は0）"""
     try:
         url = f'https://note.com/api/v3/notes/{key}'
         res = requests.get(url, headers=HEADERS, timeout=10)
         res.raise_for_status()
         data = res.json().get('data', {})
-        # body フィールドはHTML。タグを除去してカウント
         body_html = data.get('body', '') or ''
         text = re.sub(r'<[^>]+>', '', body_html)
         return len(text.strip())
@@ -162,7 +173,6 @@ def fetch_char_count(key: str) -> int:
 
 
 def load_char_cache(cache_path: Path) -> dict:
-    """key→文字数 のキャッシュをCSVから読み込む"""
     cache = {}
     if not cache_path.exists():
         return cache
@@ -179,7 +189,6 @@ def load_char_cache(cache_path: Path) -> dict:
 
 
 def save_char_cache(cache_path: Path, cache: dict):
-    """key→文字数 のキャッシュをCSVに保存"""
     with open(cache_path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow(['key', '文字数'])
@@ -188,10 +197,6 @@ def save_char_cache(cache_path: Path, cache: dict):
 
 
 def build_char_map(articles: list, cache_path: Path) -> dict:
-    """
-    全記事の key→文字数 を返す。
-    キャッシュにない記事だけAPIを叩き、終了後にキャッシュを更新する。
-    """
     cache = load_char_cache(cache_path)
     updated = False
 
@@ -203,7 +208,7 @@ def build_char_map(articles: list, cache_path: Path) -> dict:
         cache[key] = count
         updated = True
         print(f'  [文字数取得] {key}: {count}文字')
-        time.sleep(0.5)  # レート制限対策
+        time.sleep(0.5)
 
     if updated:
         save_char_cache(cache_path, cache)
@@ -229,16 +234,18 @@ def main():
     OUTPUT_DIR.mkdir(exist_ok=True)
     today = datetime.now().strftime('%Y-%m-%d')
 
+    # 最初に認証チェック（失効していればここで終了）
+    print('認証チェック中...')
+    check_auth()
+
     user = fetch_user_stats()
     articles, totals = fetch_pv_stats()
     publish_map = fetch_publish_dates()
 
-    # ── 文字数キャッシュ（初回のみAPIを叩き、以降は再利用）──
     char_cache_csv = OUTPUT_DIR / 'char_cache.csv'
     print('文字数を取得中（キャッシュにない記事のみ）...')
     char_map = build_char_map(articles, char_cache_csv)
 
-    # ── ユーザー全体の統計 ──
     user_csv = OUTPUT_DIR / 'user_stats.csv'
     append_to_csv(
         user_csv,
@@ -252,7 +259,6 @@ def main():
          totals['total_comment']]
     )
 
-    # ── 記事ごとの統計 ──
     article_csv = OUTPUT_DIR / 'article_stats.csv'
     for a in articles:
         key = a.get('key')
@@ -273,7 +279,6 @@ def main():
 
     print(f'[{today}] 記録完了：{len(articles)}記事、総PV {totals["total_pv"]}、総スキ {totals["total_like"]}')
 
-    # ── Google Drive へアップロード ──
     print('Google Drive へアップロード中...')
     drive = build_drive_service()
     for csv_path in [user_csv, article_csv, char_cache_csv]:

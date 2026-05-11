@@ -3,6 +3,8 @@ import csv
 import os
 import json
 import io
+import re
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -146,7 +148,6 @@ def fetch_user_stats():
 
 def fetch_char_count(key: str) -> int:
     """記事詳細APIから本文テキストを取得し文字数を返す（取得失敗時は0）"""
-    import time, re
     try:
         url = f'https://note.com/api/v3/notes/{key}'
         res = requests.get(url, headers=HEADERS, timeout=10)
@@ -191,7 +192,6 @@ def build_char_map(articles: list, cache_path: Path) -> dict:
     全記事の key→文字数 を返す。
     キャッシュにない記事だけAPIを叩き、終了後にキャッシュを更新する。
     """
-    import time
     cache = load_char_cache(cache_path)
     updated = False
 

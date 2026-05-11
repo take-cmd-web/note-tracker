@@ -96,7 +96,7 @@
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: var(--bg-secondary); }
   .rank { color: var(--amber); font-weight: 500; font-size: 12px; width: 32px; }
-  .art-title { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .art-title { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .art-title a { color: var(--text-primary); text-decoration: none; }
   .art-title a:hover { color: var(--accent); text-decoration: underline; }
   .art-date { font-size: 11px; color: var(--text-tertiary); font-family: monospace; white-space: nowrap; }
@@ -114,6 +114,10 @@
   .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; font-size: 12px; color: var(--text-secondary); }
   .legend-item { display: flex; align-items: center; gap: 5px; }
   .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  /* 文字数バッジ */
+  .char-badge { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+  .char-badge.long { color: var(--purple); font-weight: 500; }
 </style>
 </head>
 <body>
@@ -185,11 +189,16 @@
     </div>
   </div>
 
+  <!-- 記事一覧：文字数列追加 -->
   <div class="card">
     <div class="card-hd"><div class="card-title"><i class="ti ti-list" aria-hidden="true"></i>記事一覧 新しい順</div><div class="card-meta">LATEST FIRST</div></div>
-    <div style="overflow-x:auto"><table id="tblByDate"><thead><tr><th>#</th><th>タイトル</th><th>公開日</th><th class="num-r">PV</th><th class="num-r">スキ</th><th class="num-r">エンゲージ率</th></tr></thead><tbody><tr><td colspan="6" class="loading">読み込み中…</td></tr></tbody></table></div>
+    <div style="overflow-x:auto"><table id="tblByDate">
+      <thead><tr><th>#</th><th>タイトル</th><th>公開日</th><th class="num-r">PV</th><th class="num-r">スキ</th><th class="num-r">文字数</th><th class="num-r">エンゲージ率</th></tr></thead>
+      <tbody><tr><td colspan="7" class="loading">読み込み中…</td></tr></tbody>
+    </table></div>
   </div>
 
+  <!-- 記事ランキング：文字数列追加 -->
   <div class="card">
     <div class="card-hd">
       <div class="card-title"><i class="ti ti-trophy" aria-hidden="true"></i>記事ランキング</div>
@@ -197,9 +206,13 @@
         <button class="tab active" data-sort="PV">BY PV</button>
         <button class="tab" data-sort="スキ数">BY LIKES</button>
         <button class="tab" data-sort="engagement">BY ENGAGEMENT</button>
+        <button class="tab" data-sort="文字数">BY 文字数</button>
       </div>
     </div>
-    <div style="overflow-x:auto"><table id="tblRank"><thead><tr><th>#</th><th>タイトル</th><th>公開日</th><th class="num-r">PV</th><th class="num-r">スキ</th><th class="num-r">エンゲージ率</th></tr></thead><tbody><tr><td colspan="6" class="loading">読み込み中…</td></tr></tbody></table></div>
+    <div style="overflow-x:auto"><table id="tblRank">
+      <thead><tr><th>#</th><th>タイトル</th><th>公開日</th><th class="num-r">PV</th><th class="num-r">スキ</th><th class="num-r">文字数</th><th class="num-r">エンゲージ率</th></tr></thead>
+      <tbody><tr><td colspan="7" class="loading">読み込み中…</td></tr></tbody>
+    </table></div>
   </div>
 
 </main>
@@ -233,6 +246,13 @@ const parseD=s=>s?new Date(s+'T00:00:00'):null;
 const num=v=>{if(v===''||v==null)return null;const n=Number(String(v).replace(/,/g,''));return isNaN(n)?null:n;};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+// 文字数を表示する関数（空欄は「—」、2000字以上は強調）
+const fmtChar=n=>{
+  if(n==null||isNaN(n)||n===0)return'<span class="char-badge">—</span>';
+  const cls=n>=2000?'char-badge long':'char-badge';
+  return`<span class="${cls}">${Number(n).toLocaleString('ja-JP')}</span>`;
+};
+
 const baseOpts=()=>({responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:dark?'#1a1a18':'#fff',borderColor:dark?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.12)',borderWidth:1,titleColor:dark?'#f0ede6':'#1a1a18',bodyColor:dark?'#b4b2a9':'#5f5e5a',padding:10,cornerRadius:6}},scales:{x:{grid:{color:grid},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:grid},ticks:{callback:v=>v.toLocaleString()}}}});
 
 function movingAvg(arr,w){return arr.map((_,i)=>{const s=Math.max(0,i-w+1);const sl=arr.slice(s,i+1);return sl.reduce((a,b)=>a+b,0)/sl.length;});}
@@ -245,7 +265,21 @@ async function init(){
     userData=us.map(r=>{const c={};for(const k in r)c[k.replace(/^\ufeff/,'').trim()]=r[k];return{date:parseD(c['日付']),followers:num(c['フォロワー数']),totalPV:num(c['総PV(直近1年)']),totalLikes:num(c['総スキ数(直近1年)']),articles:num(c['記事数'])};}).filter(r=>r.date&&r.followers!=null).sort((a,b)=>a.date-b.date);
 
     const cs=v=>(v||'').replace(/\r/g,'').trim();
-    const rawA=arts.map(r=>{const c={};for(const k in r)c[cs(k).replace(/^\ufeff/,'')]=cs(r[k]);return{snap:c['日付'],publishDate:parseD(c['公開日']),title:c['タイトル'],url:c['URL'],PV:num(c['PV'])??0,'スキ数':num(c['スキ数'])??0,'コメント数':num(c['コメント数'])??0};}).filter(r=>r.title&&r.snap);
+    const rawA=arts.map(r=>{
+      const c={};
+      for(const k in r)c[cs(k).replace(/^\ufeff/,'')]=cs(r[k]);
+      return{
+        snap:c['日付'],
+        publishDate:parseD(c['公開日']),
+        title:c['タイトル'],
+        url:c['URL'],
+        PV:num(c['PV'])??0,
+        'スキ数':num(c['スキ数'])??0,
+        'コメント数':num(c['コメント数'])??0,
+        '文字数':num(c['文字数'])??0   // ★追加
+      };
+    }).filter(r=>r.title&&r.snap);
+
     const latestSnap=rawA.reduce((a,b)=>a.snap>b.snap?a:b).snap;
     const seen=new Set();
     articleData=rawA.filter(r=>r.snap===latestSnap).filter(r=>{if(seen.has(r.url))return false;seen.add(r.url);return true;});
@@ -327,6 +361,7 @@ function drawArtPV(){
   charts.ap=new Chart(document.getElementById('cArtPV'),{type:'bar',data:{labels:rows.map(r=>fmtD(r.publishDate).slice(5)),datasets:[{label:'PV',data:pvData,backgroundColor:ACCENT+'66',borderColor:ACCENT,borderWidth:1,yAxisID:'y',order:3},{label:'スキ',data:rows.map(r=>r['スキ数']),backgroundColor:AMBER+'66',borderColor:AMBER,borderWidth:1,yAxisID:'y1',order:4},{label:'PV 7日MA',data:ma7,type:'line',borderColor:PURPLE,backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:0.3,yAxisID:'y',order:1}]},options:opts});
 }
 
+// ★ 記事一覧（新しい順）：文字数列追加
 function renderByDate(){
   if(!articleData.length)return;
   const rows=articleData.map(r=>({...r,engagement:r.PV>0?r['スキ数']/r.PV:0})).filter(r=>r.publishDate).sort((a,b)=>b.publishDate-a.publishDate).slice(0,20);
@@ -338,10 +373,12 @@ function renderByDate(){
     <td class="art-date">${fmtD(r.publishDate)}</td>
     <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${(r.PV/maxPV)*100}%;background:${ACCENT}"></div><div class="bar-txt accent-num">${fmt(r.PV)}</div></div></td>
     <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${maxLk>0?(r['スキ数']/maxLk)*100:0}%;background:${AMBER}"></div><div class="bar-txt">${fmt(r['スキ数'])}</div></div></td>
+    <td class="num num-r">${fmtChar(r['文字数'])}</td>
     <td class="num num-r">${(r.engagement*100).toFixed(2)}%</td>
   </tr>`).join('');
 }
 
+// ★ 記事ランキング：文字数列追加 + BY文字数ソート対応
 function renderRank(){
   if(!articleData.length)return;
   let rows=articleData.map(r=>({...r,engagement:r.PV>0?r['スキ数']/r.PV:0})).sort((a,b)=>b[currentSort]-a[currentSort]).slice(0,20);
@@ -353,6 +390,7 @@ function renderRank(){
     <td class="art-date">${fmtD(r.publishDate)}</td>
     <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${(r.PV/maxPV)*100}%;background:${ACCENT}"></div><div class="bar-txt accent-num">${fmt(r.PV)}</div></div></td>
     <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${maxLk>0?(r['スキ数']/maxLk)*100:0}%;background:${AMBER}"></div><div class="bar-txt">${fmt(r['スキ数'])}</div></div></td>
+    <td class="num num-r">${fmtChar(r['文字数'])}</td>
     <td class="num num-r">${(r.engagement*100).toFixed(2)}%</td>
   </tr>`).join('');
 }

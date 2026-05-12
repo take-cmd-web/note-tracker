@@ -194,14 +194,15 @@ def main():
     user_csv = OUTPUT_DIR / 'user_stats.csv'
     append_to_csv(
         user_csv,
-        ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)'],
+        ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)', 'メンバーシップ数'],
         [today,
          user.get('followerCount'),
          user.get('followingCount'),
          len(articles),
          totals['total_pv'],
          totals['total_like'],
-         totals['total_comment']]
+         totals['total_comment'],
+         user.get('membershipCount', 0)]
     )
 
     article_csv = OUTPUT_DIR / 'article_stats.csv'

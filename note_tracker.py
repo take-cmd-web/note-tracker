@@ -110,17 +110,31 @@ def fetch_membership_count() -> int:
     try:
         url = f'https://note.com/api/v2/creators/{NOTE_USERNAME}/circle'
         res = requests.get(url, headers=HEADERS, timeout=10)
-        if res.status_code == 200:
-            data = res.json().get('data', {})
-            # 数値っぽいキーをすべて出力して特定する
-            numeric = {k: v for k, v in data.items() if isinstance(v, (int, float)) or (isinstance(v, str) and v.isdigit())}
-            print(f'[DEBUG] circle数値フィールド: {numeric}')
-            subscription = data.get('subscriptionCount')
-            membership   = data.get('membershipNumber')
-            print(f'メンバーシップ数: subscriptionCount={subscription}, membershipNumber={membership}')
-            for val in [subscription, membership]:
-                if val is not None:
-                    return int(val)
+        if res.status_code != 200:
+            return 0
+        data = res.json().get('data', {})
+        circle_key = data.get('key')
+        circle_id  = data.get('id')
+        print(f'[DEBUG] circle_key={circle_key}, circle_id={circle_id}')
+
+        # パターン1: key を使ったメンバー一覧（件数取得）
+        if circle_key:
+            for ep in [
+                f'https://note.com/api/v1/circles/{circle_key}/members?page=1',
+                f'https://note.com/api/v2/circles/{circle_key}/members?page=1',
+                f'https://note.com/api/v1/circles/{circle_key}',
+            ]:
+                r = requests.get(ep, headers=HEADERS, timeout=10)
+                print(f'[DEBUG] {ep} → {r.status_code}')
+                if r.status_code == 200:
+                    d = r.json()
+                    print(f'[DEBUG] response keys: {list(d.keys()) if isinstance(d, dict) else str(d)[:200]}')
+                    # totalやcountキーを探す
+                    for key in ['total', 'count', 'totalCount', 'memberCount', 'total_count']:
+                        val = d.get(key) or (d.get('data') or {}).get(key)
+                        if val is not None:
+                            print(f'メンバーシップ数: {val}（{key}）')
+                            return int(val)
     except Exception as e:
         print(f'[ERROR] メンバーシップ取得失敗: {e}')
     return 0

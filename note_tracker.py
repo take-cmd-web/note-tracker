@@ -1,24 +1,15 @@
 import requests
 import csv
 import os
-import json
-import io
 import re
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
-
 # ===== 環境変数から読み込み =====
 NOTE_USERNAME = os.environ['NOTE_USERNAME']
 COOKIE = os.environ['NOTE_COOKIE']
-
-GOOGLE_SERVICE_ACCOUNT_JSON = os.environ['GOOGLE_SERVICE_ACCOUNT_JSON']
-GOOGLE_DRIVE_FOLDER_ID = os.environ['GOOGLE_DRIVE_FOLDER_ID']
 
 OUTPUT_DIR = Path('./public')
 
@@ -29,67 +20,22 @@ HEADERS = {
     'Referer': 'https://note.com/sitesettings/stats',
 }
 
-DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive']
-
 
 # ──────────────────────────────────────────────
-# Google Drive ヘルパー
-# ──────────────────────────────────────────────
-
-def build_drive_service():
-    info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-    creds = service_account.Credentials.from_service_account_info(info, scopes=DRIVE_SCOPES)
-    return build('drive', 'v3', credentials=creds)
-
-
-def get_or_create_file_id(service, filename: str, folder_id: str) -> str | None:
-    query = (
-        f"name = '{filename}' "
-        f"and '{folder_id}' in parents "
-        f"and mimeType = 'text/csv' "
-        f"and trashed = false"
-    )
-    result = service.files().list(q=query, fields='files(id, name)').execute()
-    files = result.get('files', [])
-    return files[0]['id'] if files else None
-
-
-def upload_csv_to_drive(service, local_path: Path, folder_id: str):
-    filename = local_path.name
-    content = local_path.read_bytes()
-    media = MediaIoBaseUpload(io.BytesIO(content), mimetype='text/csv', resumable=False)
-
-    file_id = get_or_create_file_id(service, filename, folder_id)
-
-    if file_id:
-        service.files().update(fileId=file_id, media_body=media).execute()
-        print(f'  [Drive] 更新: {filename} (id={file_id})')
-    else:
-        metadata = {'name': filename, 'parents': [folder_id]}
-        service.files().create(body=metadata, media_body=media, fields='id').execute()
-        print(f'  [Drive] 新規作成: {filename}')
-
-
-# ──────────────────────────────────────────────
-# note API（認証チェック付き）
+# note API
 # ──────────────────────────────────────────────
 
 def check_auth():
-    """
-    セッションCookieの有効性を確認する。
-    無効な場合はエラーメッセージを出して終了する。
-    """
-    url = f'https://note.com/api/v1/stats/pv?filter=yearly&page=1&sort=pv'
+    """セッションCookieの有効性を確認する"""
+    url = 'https://note.com/api/v1/stats/pv?filter=yearly&page=1&sort=pv'
     res = requests.get(url, headers=HEADERS)
 
     if res.status_code == 401:
         print('::error::認証エラー（401）: NOTE_COOKIEが失効しています。GitHubのSecretsを更新してください。')
         sys.exit(1)
-
     if res.status_code == 403:
         print('::error::アクセス拒否（403）: NOTE_COOKIEが無効です。GitHubのSecretsを更新してください。')
         sys.exit(1)
-
     if res.status_code != 200:
         print(f'::error::APIエラー（{res.status_code}）: {res.text[:200]}')
         sys.exit(1)
@@ -234,7 +180,6 @@ def main():
     OUTPUT_DIR.mkdir(exist_ok=True)
     today = datetime.now().strftime('%Y-%m-%d')
 
-    # 最初に認証チェック（失効していればここで終了）
     print('認証チェック中...')
     check_auth()
 
@@ -278,12 +223,6 @@ def main():
         )
 
     print(f'[{today}] 記録完了：{len(articles)}記事、総PV {totals["total_pv"]}、総スキ {totals["total_like"]}')
-
-    print('Google Drive へアップロード中...')
-    drive = build_drive_service()
-    for csv_path in [user_csv, article_csv, char_cache_csv]:
-        upload_csv_to_drive(drive, csv_path, GOOGLE_DRIVE_FOLDER_ID)
-    print('アップロード完了')
 
 
 if __name__ == '__main__':

@@ -102,7 +102,12 @@ def fetch_user_stats():
     url = f'https://note.com/api/v2/creators/{NOTE_USERNAME}'
     res = requests.get(url, headers=HEADERS)
     res.raise_for_status()
-    return res.json().get('data', {})
+    data = res.json().get('data', {})
+    # デバッグ: 全キーとmembership関連キーを出力
+    print(f'[DEBUG] userデータの全キー: {list(data.keys())}')
+    membership_keys = {k: v for k, v in data.items() if 'member' in k.lower()}
+    print(f'[DEBUG] membership関連キー: {membership_keys}')
+    return data
 
 
 def fetch_char_count(key: str) -> int:

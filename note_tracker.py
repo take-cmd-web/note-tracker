@@ -111,30 +111,16 @@ def fetch_membership_count() -> int:
         url = f'https://note.com/api/v2/creators/{NOTE_USERNAME}/circle'
         res = requests.get(url, headers=HEADERS, timeout=10)
         if res.status_code != 200:
+            print(f'メンバーシップAPI: {res.status_code} → 0を記録')
             return 0
         data = res.json().get('data', {})
-        circle_key = data.get('key')
-        circle_id  = data.get('id')
-        print(f'[DEBUG] circle_key={circle_key}, circle_id={circle_id}')
-
-        # パターン1: key を使ったメンバー一覧（件数取得）
-        if circle_key:
-            for ep in [
-                f'https://note.com/api/v1/circles/{circle_key}/members?page=1',
-                f'https://note.com/api/v2/circles/{circle_key}/members?page=1',
-                f'https://note.com/api/v1/circles/{circle_key}',
-            ]:
-                r = requests.get(ep, headers=HEADERS, timeout=10)
-                print(f'[DEBUG] {ep} → {r.status_code}')
-                if r.status_code == 200:
-                    d = r.json()
-                    print(f'[DEBUG] response keys: {list(d.keys()) if isinstance(d, dict) else str(d)[:200]}')
-                    # totalやcountキーを探す
-                    for key in ['total', 'count', 'totalCount', 'memberCount', 'total_count']:
-                        val = d.get(key) or (d.get('data') or {}).get(key)
-                        if val is not None:
-                            print(f'メンバーシップ数: {val}（{key}）')
-                            return int(val)
+        # 取得できる数値フィールドを順に試す
+        for key in ['subscriptionCount', 'memberCount', 'membershipNumber', 'totalMemberCount']:
+            val = data.get(key)
+            if val is not None and int(val) > 0:
+                print(f'メンバーシップ数: {val}（{key}）')
+                return int(val)
+        print('メンバーシップ数: 取得できず → 0を記録')
     except Exception as e:
         print(f'[ERROR] メンバーシップ取得失敗: {e}')
     return 0
@@ -208,7 +194,6 @@ def dedup_csv(filepath: Path):
     if len(rows) <= 1:
         return
     header = rows[0]
-    # 日付をキーに最後に出現した行を保持（順序維持）
     seen = {}
     for row in rows[1:]:
         if row:
@@ -218,6 +203,19 @@ def dedup_csv(filepath: Path):
         writer.writerow(header)
         writer.writerows(seen.values())
     print(f'[重複除去] {filepath}: {len(rows)-1}行 → {len(seen)}行')
+
+
+def already_recorded(filepath: Path, today: str) -> bool:
+    """今日の日付がすでにCSVに記録済みかチェックする"""
+    if not filepath.exists():
+        return False
+    with open(filepath, newline='', encoding='utf-8-sig') as f:
+        reader = csv.reader(f)
+        next(reader, None)  # ヘッダースキップ
+        for row in reader:
+            if row and row[0] == today:
+                return True
+    return False
 
 
 def append_to_csv(filepath, headers, row):
@@ -253,18 +251,21 @@ def main():
 
     user_csv = OUTPUT_DIR / 'user_stats.csv'
     dedup_csv(user_csv)
-    append_to_csv(
-        user_csv,
-        ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)', 'メンバーシップ数'],
-        [today,
-         user.get('followerCount'),
-         user.get('followingCount'),
-         len(articles),
-         totals['total_pv'],
-         totals['total_like'],
-         totals['total_comment'],
-         membership_count]
-    )
+    if already_recorded(user_csv, today):
+        print(f'[スキップ] {today} はすでに user_stats.csv に記録済みです')
+    else:
+        append_to_csv(
+            user_csv,
+            ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)', 'メンバーシップ数'],
+            [today,
+             user.get('followerCount'),
+             user.get('followingCount'),
+             len(articles),
+             totals['total_pv'],
+             totals['total_like'],
+             totals['total_comment'],
+             membership_count]
+        )
 
     article_csv = OUTPUT_DIR / 'article_stats.csv'
     for a in articles:

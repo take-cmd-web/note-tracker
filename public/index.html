@@ -24,6 +24,7 @@
     --red: #D85A30;
     --amber: #BA7517;
     --purple: #534AB7;
+    --teal: #1A8A8A;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -40,6 +41,7 @@
       --red: #F0997B;
       --amber: #EF9F27;
       --purple: #AFA9EC;
+      --teal: #4DBDBD;
     }
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -78,8 +80,7 @@
   .card-meta { font-size: 11px; color: var(--text-tertiary); }
   .card-body { padding: 20px; }
 
-  .tab-row { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
-  .tab-group { display: flex; gap: 4px; }
+  .tab-group { display: flex; gap: 4px; flex-wrap: wrap; }
   .tab { font-size: 11px; padding: 4px 12px; border: 0.5px solid var(--border-hover); background: transparent; color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-md); transition: all 0.15s; font-family: inherit; }
   .tab:hover { color: var(--text-primary); background: var(--bg-secondary); }
   .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -113,11 +114,13 @@
 
   .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; font-size: 12px; color: var(--text-secondary); }
   .legend-item { display: flex; align-items: center; gap: 5px; }
-  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .legend-dot  { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .legend-line { width: 18px; height: 2px; border-radius: 1px; flex-shrink: 0; }
 
-  /* 文字数バッジ */
   .char-badge { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
   .char-badge.long { color: var(--purple); font-weight: 500; }
+
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); padding-left: 2px; margin: 24px 0 10px; }
 </style>
 </head>
 <body>
@@ -138,17 +141,48 @@
 
 <main>
 
+  <!-- ─── KPI ─── -->
   <div class="kpi-grid" id="kpiGrid">
-    <div class="kpi"><div class="kpi-label"><i class="ti ti-users" aria-hidden="true"></i>フォロワー</div><div class="kpi-val" id="kFollowers">—</div><div class="kpi-delta" id="kFollowersDelta"><span class="d-fl">—</span></div></div>
-    <div class="kpi"><div class="kpi-label"><i class="ti ti-eye" aria-hidden="true"></i>総PV (1年)</div><div class="kpi-val" id="kPV">—</div><div class="kpi-delta d-fl">1Y累計</div></div>
-    <div class="kpi"><div class="kpi-label"><i class="ti ti-heart" aria-hidden="true"></i>総スキ (1年)</div><div class="kpi-val" id="kLikes">—</div><div class="kpi-delta d-fl">1Y累計</div></div>
-    <div class="kpi"><div class="kpi-label"><i class="ti ti-file-text" aria-hidden="true"></i>記事数</div><div class="kpi-val" id="kArticles">—</div><div class="kpi-delta d-fl">公開中</div></div>
+    <div class="kpi">
+      <div class="kpi-label"><i class="ti ti-users"></i>フォロワー</div>
+      <div class="kpi-val" id="kFollowers">—</div>
+      <div class="kpi-delta" id="kFollowersDelta"><span class="d-fl">—</span></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label"><i class="ti ti-user-check"></i>フォロー中</div>
+      <div class="kpi-val" id="kFollowing">—</div>
+      <div class="kpi-delta" id="kFollowingDelta"><span class="d-fl">—</span></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label"><i class="ti ti-crown"></i>メンバーシップ</div>
+      <div class="kpi-val" id="kMembership">—</div>
+      <div class="kpi-delta d-fl">会員数</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label"><i class="ti ti-eye"></i>総PV (1年)</div>
+      <div class="kpi-val" id="kPV">—</div>
+      <div class="kpi-delta d-fl">1Y累計</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label"><i class="ti ti-heart"></i>総スキ (1年)</div>
+      <div class="kpi-val" id="kLikes">—</div>
+      <div class="kpi-delta d-fl">1Y累計</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label"><i class="ti ti-file-text"></i>記事数</div>
+      <div class="kpi-val" id="kArticles">—</div>
+      <div class="kpi-delta d-fl">公開中</div>
+    </div>
   </div>
 
+  <!-- ─── フォロワー / フォロー セクション ─── -->
+  <div class="section-label">フォロワー / フォロー</div>
+
+  <!-- 既存: フォロワー推移 + 日次増減 -->
   <div class="grid-2" style="margin-bottom:16px">
     <div class="card">
       <div class="card-hd">
-        <div class="card-title"><i class="ti ti-trending-up" aria-hidden="true"></i>フォロワー推移</div>
+        <div class="card-title"><i class="ti ti-trending-up"></i>フォロワー推移</div>
         <div class="tab-group" id="rangeTabGroup">
           <button class="tab active" data-range="all">ALL</button>
           <button class="tab" data-range="90">90D</button>
@@ -156,52 +190,120 @@
           <button class="tab" data-range="7">7D</button>
         </div>
       </div>
-      <div class="card-body"><div class="chart-wrap" style="height:220px"><canvas id="cFollower" role="img" aria-label="フォロワー推移">フォロワー推移</canvas></div></div>
+      <div class="card-body"><div class="chart-wrap" style="height:220px"><canvas id="cFollower"></canvas></div></div>
     </div>
     <div class="card">
-      <div class="card-hd"><div class="card-title"><i class="ti ti-arrows-diff" aria-hidden="true"></i>日次フォロワー増減</div><div class="card-meta">Net Δ / Day</div></div>
-      <div class="card-body"><div class="chart-wrap" style="height:220px"><canvas id="cDelta" role="img" aria-label="フォロワー日次増減">日次増減</canvas></div></div>
+      <div class="card-hd">
+        <div class="card-title"><i class="ti ti-arrows-diff"></i>日次フォロワー増減</div>
+        <div class="card-meta">Net Δ / Day</div>
+      </div>
+      <div class="card-body"><div class="chart-wrap" style="height:220px"><canvas id="cDelta"></canvas></div></div>
     </div>
   </div>
 
+  <!-- 新規①: フォロワー数 vs フォロー数（2軸） -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-hd">
+      <div class="card-title"><i class="ti ti-users-group"></i>フォロワー数 vs フォロー数</div>
+      <div class="tab-group" id="ffRangeTabGroup">
+        <button class="tab active" data-range="all">ALL</button>
+        <button class="tab" data-range="90">90D</button>
+        <button class="tab" data-range="30">30D</button>
+        <button class="tab" data-range="7">7D</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="ffLegend" class="legend"></div>
+      <div class="chart-wrap" style="height:240px"><canvas id="cFF"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 新規②: 前日比 + 7日MA（フォロワー・フォロー） -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-hd">
+      <div class="card-title"><i class="ti ti-activity"></i>前日比 · フォロワー / フォロー + 7日移動平均</div>
+      <div class="tab-group" id="deltaRangeTabGroup">
+        <button class="tab active" data-range="60">60D</button>
+        <button class="tab" data-range="30">30D</button>
+        <button class="tab" data-range="14">14D</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="deltaLegend" class="legend"></div>
+      <div class="chart-wrap" style="height:260px"><canvas id="cDeltaBoth"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ─── メンバーシップ セクション ─── -->
+  <div class="section-label">メンバーシップ</div>
+
+  <!-- 新規③: フォロワー数 vs メンバーシップ数（2軸） -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-hd">
+      <div class="card-title"><i class="ti ti-crown"></i>フォロワー数 vs メンバーシップ数</div>
+      <div class="tab-group" id="memRangeTabGroup">
+        <button class="tab active" data-range="all">ALL</button>
+        <button class="tab" data-range="90">90D</button>
+        <button class="tab" data-range="30">30D</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="memLegend" class="legend"></div>
+      <div class="chart-wrap" style="height:240px"><canvas id="cMem"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ─── コンテンツ指標 セクション ─── -->
+  <div class="section-label">コンテンツ指標</div>
+
   <div class="grid-eq" style="margin-bottom:16px">
     <div class="card">
-      <div class="card-hd"><div class="card-title"><i class="ti ti-chart-line" aria-hidden="true"></i>累計指標 (PV / スキ)</div><div class="card-meta">Cumulative · 1Y</div></div>
+      <div class="card-hd">
+        <div class="card-title"><i class="ti ti-chart-line"></i>累計指標 (PV / スキ)</div>
+        <div class="card-meta">Cumulative · 1Y</div>
+      </div>
       <div class="card-body">
         <div id="cumulLegend" class="legend"></div>
-        <div class="chart-wrap" style="height:200px"><canvas id="cCumul" role="img" aria-label="累計PV・スキ推移">累計指標</canvas></div>
+        <div class="chart-wrap" style="height:200px"><canvas id="cCumul"></canvas></div>
       </div>
     </div>
     <div class="card">
-      <div class="card-hd"><div class="card-title"><i class="ti ti-activity" aria-hidden="true"></i>エンゲージメント率</div><div class="card-meta">Likes / PV</div></div>
-      <div class="card-body"><div class="chart-wrap" style="height:220px"><canvas id="cEng" role="img" aria-label="エンゲージメント率推移">エンゲージメント率</canvas></div></div>
+      <div class="card-hd">
+        <div class="card-title"><i class="ti ti-activity"></i>エンゲージメント率</div>
+        <div class="card-meta">Likes / PV</div>
+      </div>
+      <div class="card-body"><div class="chart-wrap" style="height:220px"><canvas id="cEng"></canvas></div></div>
     </div>
   </div>
 
   <div class="card">
     <div class="card-hd">
-      <div class="card-title"><i class="ti ti-chart-bar" aria-hidden="true"></i>記事別 PV（直近2ヶ月）</div>
+      <div class="card-title"><i class="ti ti-chart-bar"></i>記事別 PV（直近2ヶ月）</div>
       <div class="card-meta">BY PUBLISH DATE</div>
     </div>
     <div class="card-body">
       <div id="artPvLegend" class="legend"></div>
-      <div class="chart-wrap" style="height:280px"><canvas id="cArtPV" role="img" aria-label="記事別PVグラフ">記事別PV</canvas></div>
+      <div class="chart-wrap" style="height:280px"><canvas id="cArtPV"></canvas></div>
     </div>
   </div>
 
-  <!-- 記事一覧：文字数列追加 -->
+  <!-- ─── 記事 セクション ─── -->
+  <div class="section-label">記事</div>
+
   <div class="card">
-    <div class="card-hd"><div class="card-title"><i class="ti ti-list" aria-hidden="true"></i>記事一覧 新しい順</div><div class="card-meta">LATEST FIRST</div></div>
+    <div class="card-hd">
+      <div class="card-title"><i class="ti ti-list"></i>記事一覧 新しい順</div>
+      <div class="card-meta">LATEST FIRST</div>
+    </div>
     <div style="overflow-x:auto"><table id="tblByDate">
       <thead><tr><th>#</th><th>タイトル</th><th>公開日</th><th class="num-r">PV</th><th class="num-r">スキ</th><th class="num-r">文字数</th><th class="num-r">エンゲージ率</th></tr></thead>
       <tbody><tr><td colspan="7" class="loading">読み込み中…</td></tr></tbody>
     </table></div>
   </div>
 
-  <!-- 記事ランキング：文字数列追加 -->
   <div class="card">
     <div class="card-hd">
-      <div class="card-title"><i class="ti ti-trophy" aria-hidden="true"></i>記事ランキング</div>
+      <div class="card-title"><i class="ti ti-trophy"></i>記事ランキング</div>
       <div class="tab-group" id="sortTabGroup">
         <button class="tab active" data-sort="PV">BY PV</button>
         <button class="tab" data-sort="スキ数">BY LIKES</button>
@@ -223,193 +325,437 @@
 </footer>
 
 <script>
-const USER_CSV = 'user_stats.csv';
+const USER_CSV    = 'user_stats.csv';
 const ARTICLE_CSV = 'article_stats.csv';
 const dark = matchMedia('(prefers-color-scheme: dark)').matches;
 const grid = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
-const tc = '#888780';
-const ACCENT  = dark ? '#85B7EB' : '#378ADD';
-const GREEN   = dark ? '#5DCAA5' : '#1D9E75';
-const RED     = dark ? '#F0997B' : '#D85A30';
-const AMBER   = dark ? '#EF9F27' : '#BA7517';
-const PURPLE  = dark ? '#AFA9EC' : '#534AB7';
+const tc   = '#888780';
 
-let userData=[], articleData=[], charts={}, currentRange='all', currentSort='PV';
+const ACCENT = dark ? '#85B7EB' : '#378ADD';
+const GREEN  = dark ? '#5DCAA5' : '#1D9E75';
+const RED    = dark ? '#F0997B' : '#D85A30';
+const AMBER  = dark ? '#EF9F27' : '#BA7517';
+const PURPLE = dark ? '#AFA9EC' : '#534AB7';
+const TEAL   = dark ? '#4DBDBD' : '#1A8A8A';
 
-Chart.defaults.font.family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
-Chart.defaults.font.size=11; Chart.defaults.color=tc;
+let userData = [], articleData = [], charts = {};
+let currentRange      = 'all';
+let currentFFRange    = 'all';
+let currentDeltaRange = '60';
+let currentMemRange   = 'all';
+let currentSort       = 'PV';
 
-const fmt=n=>n==null||isNaN(n)?'—':Number(n).toLocaleString('ja-JP');
-const fmtS=n=>{if(n==null||isNaN(n))return'—';const v=Number(n);return(v>=0?'+':'')+v.toLocaleString('ja-JP');};
-const fmtD=d=>d?d.toISOString().slice(0,10):'—';
-const parseD=s=>s?new Date(s+'T00:00:00'):null;
-const num=v=>{if(v===''||v==null)return null;const n=Number(String(v).replace(/,/g,''));return isNaN(n)?null:n;};
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+Chart.defaults.font.size   = 11;
+Chart.defaults.color       = tc;
 
-// 文字数を表示する関数（空欄は「—」、2000字以上は強調）
-const fmtChar=n=>{
-  if(n==null||isNaN(n)||n===0)return'<span class="char-badge">—</span>';
-  const cls=n>=2000?'char-badge long':'char-badge';
-  return`<span class="${cls}">${Number(n).toLocaleString('ja-JP')}</span>`;
+/* ── util ── */
+const fmt     = n => n == null || isNaN(n) ? '—' : Number(n).toLocaleString('ja-JP');
+const fmtD    = d => d ? d.toISOString().slice(0, 10) : '—';
+const parseD  = s => s ? new Date(s + 'T00:00:00') : null;
+const num     = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/,/g, '')); return isNaN(n) ? null : n; };
+const esc     = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const fmtChar = n => {
+  if (n == null || isNaN(n) || n === 0) return '<span class="char-badge">—</span>';
+  return `<span class="char-badge${n >= 2000 ? ' long' : ''}">${Number(n).toLocaleString('ja-JP')}</span>`;
 };
+const signCls = n => n == null ? 'd-fl' : (n >= 0 ? 'd-up' : 'd-dn');
+const signStr = n => n == null ? '—' : (n >= 0 ? `▲ +${n}` : `▼ ${n}`);
 
-const baseOpts=()=>({responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:dark?'#1a1a18':'#fff',borderColor:dark?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.12)',borderWidth:1,titleColor:dark?'#f0ede6':'#1a1a18',bodyColor:dark?'#b4b2a9':'#5f5e5a',padding:10,cornerRadius:6}},scales:{x:{grid:{color:grid},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:grid},ticks:{callback:v=>v.toLocaleString()}}}});
+function movingAvg(arr, w) {
+  return arr.map((_, i) => {
+    const s  = Math.max(0, i - w + 1);
+    const sl = arr.slice(s, i + 1);
+    return sl.reduce((a, b) => a + b, 0) / sl.length;
+  });
+}
 
-function movingAvg(arr,w){return arr.map((_,i)=>{const s=Math.max(0,i-w+1);const sl=arr.slice(s,i+1);return sl.reduce((a,b)=>a+b,0)/sl.length;});}
+/* ── base chart options ── */
+const baseOpts = () => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: dark ? '#1a1a18' : '#fff',
+      borderColor: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.12)',
+      borderWidth: 1,
+      titleColor: dark ? '#f0ede6' : '#1a1a18',
+      bodyColor:  dark ? '#b4b2a9' : '#5f5e5a',
+      padding: 10, cornerRadius: 6
+    }
+  },
+  scales: {
+    x: { grid: { color: grid }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+    y: { grid: { color: grid }, ticks: { callback: v => v.toLocaleString() } }
+  }
+});
 
-async function loadCSV(path){return new Promise((res,rej)=>{Papa.parse(path,{download:true,header:true,skipEmptyLines:true,complete:r=>res(r.data),error:e=>rej(e)});});}
+/* 2軸オプション */
+function dualOpts(leftTitle = '', rightTitle = '', maxTicks = 8) {
+  const o = baseOpts();
+  o.scales = {
+    x:  { grid: { color: grid }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: maxTicks } },
+    y:  { grid: { color: grid }, position: 'left',  ticks: { callback: v => v.toLocaleString() },
+          title: { display: !!leftTitle,  text: leftTitle,  color: tc, font: { size: 10 } } },
+    y1: { grid: { drawOnChartArea: false }, position: 'right', ticks: { callback: v => v.toLocaleString() },
+          title: { display: !!rightTitle, text: rightTitle, color: tc, font: { size: 10 } } }
+  };
+  return o;
+}
 
-async function init(){
+/* ── CSV loader ── */
+async function loadCSV(path) {
+  return new Promise((res, rej) => {
+    Papa.parse(path, { download: true, header: true, skipEmptyLines: true, complete: r => res(r.data), error: e => rej(e) });
+  });
+}
+
+/* range filter (days = 'all' or number string) */
+function rangedData(days) {
+  if (!days || days === 'all') return userData;
+  const n   = parseInt(days);
+  const cut = userData[userData.length - 1].date - n * 86400000;
+  return userData.filter(r => r.date >= cut);
+}
+
+/* ── init ── */
+async function init() {
   try {
-    const [us,arts]=await Promise.all([loadCSV(USER_CSV),loadCSV(ARTICLE_CSV)]);
-    userData=us.map(r=>{const c={};for(const k in r)c[k.replace(/^\ufeff/,'').trim()]=r[k];return{date:parseD(c['日付']),followers:num(c['フォロワー数']),totalPV:num(c['総PV(直近1年)']),totalLikes:num(c['総スキ数(直近1年)']),articles:num(c['記事数'])};}).filter(r=>r.date&&r.followers!=null).sort((a,b)=>a.date-b.date);
+    const [us, arts] = await Promise.all([loadCSV(USER_CSV), loadCSV(ARTICLE_CSV)]);
 
-    const cs=v=>(v||'').replace(/\r/g,'').trim();
-    const rawA=arts.map(r=>{
-      const c={};
-      for(const k in r)c[cs(k).replace(/^\ufeff/,'')]=cs(r[k]);
-      return{
-        snap:c['日付'],
-        publishDate:parseD(c['公開日']),
-        title:c['タイトル'],
-        url:c['URL'],
-        PV:num(c['PV'])??0,
-        'スキ数':num(c['スキ数'])??0,
-        'コメント数':num(c['コメント数'])??0,
-        '文字数':num(c['文字数'])??0   // ★追加
+    /* user stats */
+    userData = us.map(r => {
+      const c = {};
+      for (const k in r) c[k.replace(/^\ufeff/, '').trim()] = r[k];
+      return {
+        date:       parseD(c['日付']),
+        followers:  num(c['フォロワー数']),
+        following:  num(c['フォロー数']),
+        membership: num(c['メンバーシップ数']),
+        totalPV:    num(c['総PV(直近1年)']),
+        totalLikes: num(c['総スキ数(直近1年)']),
+        articles:   num(c['記事数'])
       };
-    }).filter(r=>r.title&&r.snap);
+    }).filter(r => r.date && r.followers != null).sort((a, b) => a.date - b.date);
 
-    const latestSnap=rawA.reduce((a,b)=>a.snap>b.snap?a:b).snap;
-    const seen=new Set();
-    articleData=rawA.filter(r=>r.snap===latestSnap).filter(r=>{if(seen.has(r.url))return false;seen.add(r.url);return true;});
+    /* article stats */
+    const cs = v => (v || '').replace(/\r/g, '').trim();
+    const rawA = arts.map(r => {
+      const c = {};
+      for (const k in r) c[cs(k).replace(/^\ufeff/, '')] = cs(r[k]);
+      return {
+        snap: c['日付'], publishDate: parseD(c['公開日']),
+        title: c['タイトル'], url: c['URL'],
+        PV: num(c['PV']) ?? 0,
+        'スキ数': num(c['スキ数']) ?? 0,
+        'コメント数': num(c['コメント数']) ?? 0,
+        '文字数': num(c['文字数']) ?? 0
+      };
+    }).filter(r => r.title && r.snap);
 
-    const last=userData[userData.length-1];
-    document.getElementById('updatedAt').textContent=`更新: ${fmtD(last?.date)}`;
-    document.getElementById('footerTime').textContent=`generated ${new Date().toISOString().slice(0,16).replace('T',' ')}`;
+    const latestSnap = rawA.reduce((a, b) => a.snap > b.snap ? a : b).snap;
+    const seen = new Set();
+    articleData = rawA.filter(r => r.snap === latestSnap).filter(r => {
+      if (seen.has(r.url)) return false; seen.add(r.url); return true;
+    });
 
-    renderKPI(); drawFollower(); drawDelta(); drawCumul(); drawEng(); drawArtPV(); renderByDate(); renderRank();
-  } catch(e){
-    document.getElementById('kpiGrid').innerHTML=`<div class="error-msg" style="grid-column:1/-1">CSV読み込みエラー: ${e.message}<br>同じフォルダに user_stats.csv / article_stats.csv を配置してください。</div>`;
+    const last = userData[userData.length - 1];
+    document.getElementById('updatedAt').textContent  = `更新: ${fmtD(last?.date)}`;
+    document.getElementById('footerTime').textContent = `generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+
+    renderKPI();
+    drawFollower();
+    drawDelta();
+    drawFF();
+    drawDeltaBoth();
+    drawMem();
+    drawCumul();
+    drawEng();
+    drawArtPV();
+    renderByDate();
+    renderRank();
+
+  } catch (e) {
+    document.getElementById('kpiGrid').innerHTML =
+      `<div class="error-msg" style="grid-column:1/-1">CSV読み込みエラー: ${e.message}<br>同じフォルダに user_stats.csv / article_stats.csv を配置してください。</div>`;
     console.error(e);
   }
 }
 
-function renderKPI(){
-  const last=userData[userData.length-1]||{};
-  const prev=userData[userData.length-2]||{};
-  const fd=last.followers&&prev.followers?last.followers-prev.followers:null;
-  document.getElementById('kFollowers').textContent=fmt(last.followers);
-  document.getElementById('kPV').textContent=fmt(last.totalPV);
-  document.getElementById('kLikes').textContent=fmt(last.totalLikes);
-  document.getElementById('kArticles').textContent=fmt(last.articles);
-  const del=document.getElementById('kFollowersDelta');
-  if(fd!=null){del.innerHTML=`<span class="${fd>=0?'d-up':'d-dn'}">${fd>=0?'▲ +':'▼ '}${fd} vs 前日</span>`;}
-  else del.innerHTML=`<span class="d-fl">最新スナップショット</span>`;
+/* ── KPI ── */
+function renderKPI() {
+  const last = userData[userData.length - 1] || {};
+  const prev = userData[userData.length - 2] || {};
+  const fd  = last.followers != null && prev.followers != null ? last.followers - prev.followers : null;
+  const fgd = last.following != null && prev.following != null ? last.following  - prev.following  : null;
+
+  document.getElementById('kFollowers').textContent  = fmt(last.followers);
+  document.getElementById('kFollowing').textContent  = fmt(last.following);
+  document.getElementById('kMembership').textContent = fmt(last.membership);
+  document.getElementById('kPV').textContent         = fmt(last.totalPV);
+  document.getElementById('kLikes').textContent      = fmt(last.totalLikes);
+  document.getElementById('kArticles').textContent   = fmt(last.articles);
+
+  document.getElementById('kFollowersDelta').innerHTML =
+    `<span class="${signCls(fd)}">${fd != null ? signStr(fd) + ' vs 前日' : '最新スナップショット'}</span>`;
+  document.getElementById('kFollowingDelta').innerHTML =
+    `<span class="${signCls(fgd)}">${fgd != null ? signStr(fgd) + ' vs 前日' : '最新スナップショット'}</span>`;
 }
 
-function rangedData(range){
-  if(range==='all')return userData;
-  const days=parseInt(range);
-  const cut=userData[userData.length-1].date-days*86400000;
-  return userData.filter(r=>r.date>=cut);
+/* ── 既存: フォロワー推移 ── */
+function drawFollower() {
+  const d = rangedData(currentRange);
+  if (charts.f) charts.f.destroy();
+  charts.f = new Chart(document.getElementById('cFollower'), {
+    type: 'line',
+    data: { labels: d.map(r => fmtD(r.date).slice(5)), datasets: [{
+      data: d.map(r => r.followers),
+      borderColor: ACCENT, backgroundColor: ACCENT + '18',
+      borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: true
+    }]},
+    options: baseOpts()
+  });
 }
 
-function drawFollower(){
-  const d=rangedData(currentRange);
-  if(charts.f)charts.f.destroy();
-  charts.f=new Chart(document.getElementById('cFollower'),{type:'line',data:{labels:d.map(r=>fmtD(r.date).slice(5)),datasets:[{data:d.map(r=>r.followers),borderColor:ACCENT,backgroundColor:ACCENT+'18',borderWidth:2,pointRadius:d.length>60?0:3,tension:0.3,fill:true}]},options:baseOpts()});
+/* ── 既存: 日次フォロワー増減（棒 + MA） ── */
+function drawDelta() {
+  const sl = userData.slice(-31);
+  const labels = [], vals = [];
+  for (let i = 1; i < sl.length; i++) {
+    labels.push(fmtD(sl[i].date).slice(5));
+    vals.push(sl[i].followers != null && sl[i-1].followers != null ? sl[i].followers - sl[i-1].followers : null);
+  }
+  const ma7 = movingAvg(vals.map(v => v ?? 0), 7);
+  if (charts.d) charts.d.destroy();
+  charts.d = new Chart(document.getElementById('cDelta'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { type: 'bar',  data: vals, backgroundColor: vals.map(v => v == null ? 'transparent' : v >= 0 ? GREEN + '99' : RED + '99'), borderWidth: 0, order: 2 },
+      { type: 'line', data: ma7, borderColor: AMBER, backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3, order: 1 }
+    ]},
+    options: baseOpts()
+  });
 }
 
-function drawDelta(){
-  const sl=userData.slice(-31);
-  const labels=[],vals=[];
-  for(let i=1;i<sl.length;i++){labels.push(fmtD(sl[i].date).slice(5));vals.push(sl[i].followers-sl[i-1].followers);}
-  const ma7=movingAvg(vals,7);
-  if(charts.d)charts.d.destroy();
-  charts.d=new Chart(document.getElementById('cDelta'),{type:'bar',data:{labels,datasets:[{type:'bar',data:vals,backgroundColor:vals.map(v=>v>=0?GREEN+'99':RED+'99'),borderWidth:0,order:2},{type:'line',data:ma7,borderColor:AMBER,backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:0.3,order:1}]},options:baseOpts()});
+/* ── 新規①: フォロワー数 vs フォロー数（2軸折れ線） ── */
+function drawFF() {
+  const d = rangedData(currentFFRange);
+  document.getElementById('ffLegend').innerHTML =
+    `<span class="legend-item"><span class="legend-dot" style="background:${ACCENT}"></span>フォロワー数（左軸）</span>` +
+    `<span class="legend-item"><span class="legend-dot" style="background:${TEAL}"></span>フォロー数（右軸）</span>`;
+  if (charts.ff) charts.ff.destroy();
+  charts.ff = new Chart(document.getElementById('cFF'), {
+    type: 'line',
+    data: { labels: d.map(r => fmtD(r.date).slice(5)), datasets: [
+      { label: 'フォロワー数', data: d.map(r => r.followers),
+        borderColor: ACCENT, backgroundColor: ACCENT + '18',
+        borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: true, yAxisID: 'y' },
+      { label: 'フォロー数',   data: d.map(r => r.following),
+        borderColor: TEAL,   backgroundColor: TEAL   + '18',
+        borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: true, yAxisID: 'y1' }
+    ]},
+    options: dualOpts('フォロワー数', 'フォロー数')
+  });
 }
 
-function drawCumul(){
-  const filtered=userData.filter(r=>r.totalPV!=null);
-  if(!filtered.length){document.getElementById('cCumul').parentElement.innerHTML='<div class="loading">PVデータがありません</div>';return;}
-  const opts={...baseOpts(),scales:{x:{grid:{color:grid},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:grid},position:'left',ticks:{callback:v=>v.toLocaleString()}},y1:{grid:{drawOnChartArea:false,color:grid},position:'right',ticks:{callback:v=>v.toLocaleString()}}}};
-  document.getElementById('cumulLegend').innerHTML=`<span class="legend-item"><span class="legend-dot" style="background:${ACCENT}"></span>総PV</span><span class="legend-item"><span class="legend-dot" style="background:${AMBER}"></span>総スキ数</span>`;
-  if(charts.c)charts.c.destroy();
-  charts.c=new Chart(document.getElementById('cCumul'),{type:'line',data:{labels:filtered.map(r=>fmtD(r.date).slice(5)),datasets:[{label:'総PV',data:filtered.map(r=>r.totalPV),borderColor:ACCENT,backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:0.25,yAxisID:'y'},{label:'総スキ数',data:filtered.map(r=>r.totalLikes),borderColor:AMBER,backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:0.25,yAxisID:'y1'}]},options:opts});
+/* ── 新規②: 前日比（フォロワー・フォロー）+ 7日MA ── */
+function drawDeltaBoth() {
+  const n   = parseInt(currentDeltaRange);
+  const raw = userData.slice(-(n + 1));  // diff 計算のため1日多く取得
+  const labels = [], dFol = [], dFing = [];
+
+  for (let i = 1; i < raw.length; i++) {
+    labels.push(fmtD(raw[i].date).slice(5));
+    dFol.push(  raw[i].followers != null && raw[i-1].followers != null ? raw[i].followers - raw[i-1].followers : null);
+    dFing.push( raw[i].following != null && raw[i-1].following != null ? raw[i].following  - raw[i-1].following  : null);
+  }
+
+  const ma7Fol  = movingAvg(dFol.map(v  => v  ?? 0), 7);
+  const ma7Fing = movingAvg(dFing.map(v => v ?? 0), 7);
+
+  document.getElementById('deltaLegend').innerHTML =
+    `<span class="legend-item"><span class="legend-dot"  style="background:${ACCENT + '99'}"></span>フォロワー前日比</span>` +
+    `<span class="legend-item"><span class="legend-line" style="background:${ACCENT}"></span>同 7日MA</span>` +
+    `<span class="legend-item"><span class="legend-dot"  style="background:${TEAL + '99'}"></span>フォロー前日比</span>` +
+    `<span class="legend-item"><span class="legend-line" style="background:${TEAL}"></span>同 7日MA</span>`;
+
+  const opts = baseOpts();
+  opts.plugins.tooltip.callbacks = {
+    label: item => {
+      const v = typeof item.raw === 'number' ? item.raw.toFixed(1) : '—';
+      return ` ${item.dataset.label}: ${v}`;
+    }
+  };
+
+  if (charts.db) charts.db.destroy();
+  charts.db = new Chart(document.getElementById('cDeltaBoth'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      /* フォロワー前日比（棒） */
+      { type: 'bar',  label: 'フォロワー前日比',
+        data: dFol,
+        backgroundColor: dFol.map(v  => v == null ? 'transparent' : v  >= 0 ? ACCENT + '88' : RED + '88'),
+        borderWidth: 0, order: 4 },
+      /* フォロワー 7日MA（線） */
+      { type: 'line', label: 'フォロワー 7日MA',
+        data: ma7Fol,
+        borderColor: ACCENT, backgroundColor: 'transparent',
+        borderWidth: 2.5, pointRadius: 0, tension: 0.4, order: 2 },
+      /* フォロー前日比（棒） */
+      { type: 'bar',  label: 'フォロー前日比',
+        data: dFing,
+        backgroundColor: dFing.map(v => v == null ? 'transparent' : v >= 0 ? TEAL + '88' : AMBER + '88'),
+        borderWidth: 0, order: 3 },
+      /* フォロー 7日MA（線） */
+      { type: 'line', label: 'フォロー 7日MA',
+        data: ma7Fing,
+        borderColor: TEAL, backgroundColor: 'transparent',
+        borderWidth: 2.5, pointRadius: 0, tension: 0.4, order: 1 }
+    ]},
+    options: opts
+  });
 }
 
-function drawEng(){
-  const filtered=userData.filter(r=>r.totalPV&&r.totalLikes&&r.totalPV>0);
-  if(!filtered.length){document.getElementById('cEng').parentElement.innerHTML='<div class="loading">エンゲージメントデータがありません</div>';return;}
-  const opts={...baseOpts(),scales:{x:{grid:{color:grid},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:grid},ticks:{callback:v=>v.toFixed(2)+'%'}}}};
-  if(charts.e)charts.e.destroy();
-  charts.e=new Chart(document.getElementById('cEng'),{type:'line',data:{labels:filtered.map(r=>fmtD(r.date).slice(5)),datasets:[{data:filtered.map(r=>r.totalLikes/r.totalPV*100),borderColor:GREEN,backgroundColor:GREEN+'18',borderWidth:2,pointRadius:0,tension:0.25,fill:true}]},options:opts});
+/* ── 新規③: フォロワー数 vs メンバーシップ数（2軸折れ線） ── */
+function drawMem() {
+  const d       = rangedData(currentMemRange);
+  const hasData = d.some(r => r.membership != null && r.membership > 0);
+  document.getElementById('memLegend').innerHTML =
+    `<span class="legend-item"><span class="legend-dot" style="background:${ACCENT}"></span>フォロワー数（左軸）</span>` +
+    `<span class="legend-item"><span class="legend-dot" style="background:${PURPLE}"></span>メンバーシップ数（右軸）</span>` +
+    (!hasData ? '<span class="legend-item" style="color:var(--text-tertiary)">※ メンバーシップデータ未収集</span>' : '');
+
+  if (charts.mem) charts.mem.destroy();
+  charts.mem = new Chart(document.getElementById('cMem'), {
+    type: 'line',
+    data: { labels: d.map(r => fmtD(r.date).slice(5)), datasets: [
+      { label: 'フォロワー数',       data: d.map(r => r.followers),
+        borderColor: ACCENT, backgroundColor: ACCENT + '18',
+        borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: true, yAxisID: 'y' },
+      { label: 'メンバーシップ数', data: d.map(r => r.membership),
+        borderColor: PURPLE, backgroundColor: PURPLE + '18',
+        borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: false, yAxisID: 'y1' }
+    ]},
+    options: dualOpts('フォロワー数', 'メンバーシップ数')
+  });
 }
 
-function drawArtPV(){
-  if(!articleData.length)return;
-  const cut=new Date();cut.setDate(cut.getDate()-60);
-  const rows=articleData.filter(r=>r.publishDate&&r.publishDate>=cut).sort((a,b)=>a.publishDate-b.publishDate);
-  if(!rows.length){document.getElementById('cArtPV').parentElement.innerHTML='<div class="loading">直近2ヶ月に公開された記事がありません</div>';return;}
-  const pvData=rows.map(r=>r.PV);
-  const ma7=movingAvg(pvData,7);
-  const titles=rows.map(r=>r.title);
-  const opts={...baseOpts(),scales:{x:{grid:{color:grid},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:20}},y:{grid:{color:grid},position:'left',ticks:{callback:v=>v.toLocaleString()}},y1:{grid:{drawOnChartArea:false},position:'right',ticks:{callback:v=>v.toLocaleString()}}},plugins:{...baseOpts().plugins,tooltip:{...baseOpts().plugins.tooltip,callbacks:{title:items=>titles[items[0].dataIndex],label:item=>` ${item.dataset.label}: ${typeof item.raw==='number'?item.raw.toFixed(item.dataset.label.includes('MA')?1:0):item.raw}`}}}};
-  document.getElementById('artPvLegend').innerHTML=`<span class="legend-item"><span class="legend-dot" style="background:${ACCENT}"></span>PV</span><span class="legend-item"><span class="legend-dot" style="background:${AMBER}"></span>スキ</span><span class="legend-item"><span class="legend-dot" style="background:${PURPLE}"></span>PV 7日MA</span>`;
-  if(charts.ap)charts.ap.destroy();
-  charts.ap=new Chart(document.getElementById('cArtPV'),{type:'bar',data:{labels:rows.map(r=>fmtD(r.publishDate).slice(5)),datasets:[{label:'PV',data:pvData,backgroundColor:ACCENT+'66',borderColor:ACCENT,borderWidth:1,yAxisID:'y',order:3},{label:'スキ',data:rows.map(r=>r['スキ数']),backgroundColor:AMBER+'66',borderColor:AMBER,borderWidth:1,yAxisID:'y1',order:4},{label:'PV 7日MA',data:ma7,type:'line',borderColor:PURPLE,backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:0.3,yAxisID:'y',order:1}]},options:opts});
+/* ── 既存: 累計指標 ── */
+function drawCumul() {
+  const filtered = userData.filter(r => r.totalPV != null);
+  if (!filtered.length) { document.getElementById('cCumul').parentElement.innerHTML = '<div class="loading">PVデータがありません</div>'; return; }
+  document.getElementById('cumulLegend').innerHTML =
+    `<span class="legend-item"><span class="legend-dot" style="background:${ACCENT}"></span>総PV</span>` +
+    `<span class="legend-item"><span class="legend-dot" style="background:${AMBER}"></span>総スキ数</span>`;
+  if (charts.c) charts.c.destroy();
+  charts.c = new Chart(document.getElementById('cCumul'), {
+    type: 'line',
+    data: { labels: filtered.map(r => fmtD(r.date).slice(5)), datasets: [
+      { label: '総PV',    data: filtered.map(r => r.totalPV),    borderColor: ACCENT, backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.25, yAxisID: 'y' },
+      { label: '総スキ数', data: filtered.map(r => r.totalLikes), borderColor: AMBER,  backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.25, yAxisID: 'y1' }
+    ]},
+    options: dualOpts()
+  });
 }
 
-// ★ 記事一覧（新しい順）：文字数列追加
-function renderByDate(){
-  if(!articleData.length)return;
-  const rows=articleData.map(r=>({...r,engagement:r.PV>0?r['スキ数']/r.PV:0})).filter(r=>r.publishDate).sort((a,b)=>b.publishDate-a.publishDate).slice(0,20);
-  const maxPV=Math.max(...rows.map(r=>r.PV));
-  const maxLk=Math.max(...rows.map(r=>r['スキ数']));
-  document.querySelector('#tblByDate tbody').innerHTML=rows.map((r,i)=>`<tr>
-    <td class="rank">${String(i+1).padStart(2,'0')}</td>
+/* ── 既存: エンゲージメント率 ── */
+function drawEng() {
+  const filtered = userData.filter(r => r.totalPV && r.totalLikes && r.totalPV > 0);
+  if (!filtered.length) { document.getElementById('cEng').parentElement.innerHTML = '<div class="loading">エンゲージメントデータがありません</div>'; return; }
+  const opts = baseOpts();
+  opts.scales.y.ticks = { callback: v => v.toFixed(2) + '%' };
+  if (charts.e) charts.e.destroy();
+  charts.e = new Chart(document.getElementById('cEng'), {
+    type: 'line',
+    data: { labels: filtered.map(r => fmtD(r.date).slice(5)), datasets: [{
+      data: filtered.map(r => r.totalLikes / r.totalPV * 100),
+      borderColor: GREEN, backgroundColor: GREEN + '18', borderWidth: 2, pointRadius: 0, tension: 0.25, fill: true
+    }]},
+    options: opts
+  });
+}
+
+/* ── 既存: 記事別PV ── */
+function drawArtPV() {
+  if (!articleData.length) return;
+  const cut  = new Date(); cut.setDate(cut.getDate() - 60);
+  const rows = articleData.filter(r => r.publishDate && r.publishDate >= cut).sort((a, b) => a.publishDate - b.publishDate);
+  if (!rows.length) { document.getElementById('cArtPV').parentElement.innerHTML = '<div class="loading">直近2ヶ月に公開された記事がありません</div>'; return; }
+  const pvData = rows.map(r => r.PV), ma7 = movingAvg(pvData, 7), titles = rows.map(r => r.title);
+  const opts = dualOpts('PV', 'スキ', 20);
+  opts.plugins.tooltip.callbacks = {
+    title:  items => titles[items[0].dataIndex],
+    label:  item  => ` ${item.dataset.label}: ${typeof item.raw === 'number' ? item.raw.toFixed(item.dataset.label.includes('MA') ? 1 : 0) : item.raw}`
+  };
+  document.getElementById('artPvLegend').innerHTML =
+    `<span class="legend-item"><span class="legend-dot"  style="background:${ACCENT}"></span>PV</span>` +
+    `<span class="legend-item"><span class="legend-dot"  style="background:${AMBER}"></span>スキ</span>` +
+    `<span class="legend-item"><span class="legend-line" style="background:${PURPLE}"></span>PV 7日MA</span>`;
+  if (charts.ap) charts.ap.destroy();
+  charts.ap = new Chart(document.getElementById('cArtPV'), {
+    type: 'bar',
+    data: { labels: rows.map(r => fmtD(r.publishDate).slice(5)), datasets: [
+      { label: 'PV',      data: pvData,               backgroundColor: ACCENT + '66', borderColor: ACCENT, borderWidth: 1, yAxisID: 'y',  order: 3 },
+      { label: 'スキ',    data: rows.map(r => r['スキ数']), backgroundColor: AMBER + '66', borderColor: AMBER,  borderWidth: 1, yAxisID: 'y1', order: 4 },
+      { label: 'PV 7日MA', data: ma7, type: 'line', borderColor: PURPLE, backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y', order: 1 }
+    ]},
+    options: opts
+  });
+}
+
+/* ── 記事一覧（新しい順） ── */
+function renderByDate() {
+  if (!articleData.length) return;
+  const rows = articleData.map(r => ({ ...r, engagement: r.PV > 0 ? r['スキ数'] / r.PV : 0 }))
+    .filter(r => r.publishDate).sort((a, b) => b.publishDate - a.publishDate).slice(0, 20);
+  const maxPV = Math.max(...rows.map(r => r.PV));
+  const maxLk = Math.max(...rows.map(r => r['スキ数']));
+  document.querySelector('#tblByDate tbody').innerHTML = rows.map((r, i) => `<tr>
+    <td class="rank">${String(i + 1).padStart(2, '0')}</td>
     <td class="art-title"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.title)}</a></td>
     <td class="art-date">${fmtD(r.publishDate)}</td>
-    <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${(r.PV/maxPV)*100}%;background:${ACCENT}"></div><div class="bar-txt accent-num">${fmt(r.PV)}</div></div></td>
-    <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${maxLk>0?(r['スキ数']/maxLk)*100:0}%;background:${AMBER}"></div><div class="bar-txt">${fmt(r['スキ数'])}</div></div></td>
+    <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${(r.PV / maxPV) * 100}%;background:${ACCENT}"></div><div class="bar-txt accent-num">${fmt(r.PV)}</div></div></td>
+    <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${maxLk > 0 ? (r['スキ数'] / maxLk) * 100 : 0}%;background:${AMBER}"></div><div class="bar-txt">${fmt(r['スキ数'])}</div></div></td>
     <td class="num num-r">${fmtChar(r['文字数'])}</td>
-    <td class="num num-r">${(r.engagement*100).toFixed(2)}%</td>
+    <td class="num num-r">${(r.engagement * 100).toFixed(2)}%</td>
   </tr>`).join('');
 }
 
-// ★ 記事ランキング：文字数列追加 + BY文字数ソート対応
-function renderRank(){
-  if(!articleData.length)return;
-  let rows=articleData.map(r=>({...r,engagement:r.PV>0?r['スキ数']/r.PV:0})).sort((a,b)=>b[currentSort]-a[currentSort]).slice(0,20);
-  const maxPV=Math.max(...rows.map(r=>r.PV));
-  const maxLk=Math.max(...rows.map(r=>r['スキ数']));
-  document.querySelector('#tblRank tbody').innerHTML=rows.map((r,i)=>`<tr>
-    <td class="rank">${String(i+1).padStart(2,'0')}</td>
+/* ── 記事ランキング ── */
+function renderRank() {
+  if (!articleData.length) return;
+  const rows = articleData.map(r => ({ ...r, engagement: r.PV > 0 ? r['スキ数'] / r.PV : 0 }))
+    .sort((a, b) => b[currentSort] - a[currentSort]).slice(0, 20);
+  const maxPV = Math.max(...rows.map(r => r.PV));
+  const maxLk = Math.max(...rows.map(r => r['スキ数']));
+  document.querySelector('#tblRank tbody').innerHTML = rows.map((r, i) => `<tr>
+    <td class="rank">${String(i + 1).padStart(2, '0')}</td>
     <td class="art-title"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.title)}</a></td>
     <td class="art-date">${fmtD(r.publishDate)}</td>
-    <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${(r.PV/maxPV)*100}%;background:${ACCENT}"></div><div class="bar-txt accent-num">${fmt(r.PV)}</div></div></td>
-    <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${maxLk>0?(r['スキ数']/maxLk)*100:0}%;background:${AMBER}"></div><div class="bar-txt">${fmt(r['スキ数'])}</div></div></td>
+    <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${(r.PV / maxPV) * 100}%;background:${ACCENT}"></div><div class="bar-txt accent-num">${fmt(r.PV)}</div></div></td>
+    <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${maxLk > 0 ? (r['スキ数'] / maxLk) * 100 : 0}%;background:${AMBER}"></div><div class="bar-txt">${fmt(r['スキ数'])}</div></div></td>
     <td class="num num-r">${fmtChar(r['文字数'])}</td>
-    <td class="num num-r">${(r.engagement*100).toFixed(2)}%</td>
+    <td class="num num-r">${(r.engagement * 100).toFixed(2)}%</td>
   </tr>`).join('');
 }
 
-document.getElementById('rangeTabGroup').addEventListener('click',e=>{
-  const btn=e.target.closest('.tab');if(!btn)return;
-  document.querySelectorAll('#rangeTabGroup .tab').forEach(t=>t.classList.remove('active'));
-  btn.classList.add('active');
-  currentRange=btn.dataset.range;
-  drawFollower();
-});
+/* ── タブイベント ── */
+function bindTabs(groupId, onSelect) {
+  document.getElementById(groupId).addEventListener('click', e => {
+    const btn = e.target.closest('.tab'); if (!btn) return;
+    document.querySelectorAll(`#${groupId} .tab`).forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    onSelect(btn.dataset);
+  });
+}
 
-document.getElementById('sortTabGroup').addEventListener('click',e=>{
-  const btn=e.target.closest('.tab');if(!btn)return;
-  document.querySelectorAll('#sortTabGroup .tab').forEach(t=>t.classList.remove('active'));
-  btn.classList.add('active');
-  currentSort=btn.dataset.sort;
-  renderRank();
-});
+bindTabs('rangeTabGroup',    d => { currentRange      = d.range; drawFollower(); });
+bindTabs('ffRangeTabGroup',  d => { currentFFRange    = d.range; drawFF(); });
+bindTabs('deltaRangeTabGroup', d => { currentDeltaRange = d.range; drawDeltaBoth(); });
+bindTabs('memRangeTabGroup', d => { currentMemRange   = d.range; drawMem(); });
+bindTabs('sortTabGroup',     d => { currentSort       = d.sort;  renderRank(); });
 
 init();
 </script>

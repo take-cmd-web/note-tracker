@@ -112,10 +112,15 @@ def fetch_membership_count() -> int:
         res = requests.get(url, headers=HEADERS, timeout=10)
         if res.status_code == 200:
             data = res.json().get('data', {})
-            # subscriptionCount = 現在の有効会員数
-            count = data.get('subscriptionCount', 0)
-            print(f'メンバーシップ数: {count}（subscriptionCount）')
-            return int(count)
+            # 数値っぽいキーをすべて出力して特定する
+            numeric = {k: v for k, v in data.items() if isinstance(v, (int, float)) or (isinstance(v, str) and v.isdigit())}
+            print(f'[DEBUG] circle数値フィールド: {numeric}')
+            subscription = data.get('subscriptionCount')
+            membership   = data.get('membershipNumber')
+            print(f'メンバーシップ数: subscriptionCount={subscription}, membershipNumber={membership}')
+            for val in [subscription, membership]:
+                if val is not None:
+                    return int(val)
     except Exception as e:
         print(f'[ERROR] メンバーシップ取得失敗: {e}')
     return 0
@@ -179,6 +184,28 @@ def build_char_map(articles: list, cache_path: Path) -> dict:
     return cache
 
 
+def dedup_csv(filepath: Path):
+    """同一日付の重複行を除去し、各日付の最終行だけ残す"""
+    if not filepath.exists():
+        return
+    with open(filepath, newline='', encoding='utf-8-sig') as f:
+        reader = csv.reader(f)
+        rows = list(reader)
+    if len(rows) <= 1:
+        return
+    header = rows[0]
+    # 日付をキーに最後に出現した行を保持（順序維持）
+    seen = {}
+    for row in rows[1:]:
+        if row:
+            seen[row[0]] = row
+    with open(filepath, 'w', newline='', encoding='utf-8-sig') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(seen.values())
+    print(f'[重複除去] {filepath}: {len(rows)-1}行 → {len(seen)}行')
+
+
 def append_to_csv(filepath, headers, row):
     file_exists = filepath.exists()
     with open(filepath, 'a', newline='', encoding='utf-8-sig') as f:
@@ -211,6 +238,7 @@ def main():
     char_map = build_char_map(articles, char_cache_csv)
 
     user_csv = OUTPUT_DIR / 'user_stats.csv'
+    dedup_csv(user_csv)
     append_to_csv(
         user_csv,
         ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)', 'メンバーシップ数'],

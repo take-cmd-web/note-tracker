@@ -154,11 +154,6 @@
       <div class="kpi-delta" id="kFollowingDelta"><span class="d-fl">—</span></div>
     </div>
     <div class="kpi">
-      <div class="kpi-label"><i class="ti ti-crown"></i>メンバーシップ</div>
-      <div class="kpi-val" id="kMembership">—</div>
-      <div class="kpi-delta d-fl">会員数</div>
-    </div>
-    <div class="kpi">
       <div class="kpi-label"><i class="ti ti-eye"></i>総PV (1年)</div>
       <div class="kpi-val" id="kPV">—</div>
       <div class="kpi-delta d-fl">1Y累計</div>
@@ -231,25 +226,6 @@
     <div class="card-body">
       <div id="deltaLegend" class="legend"></div>
       <div class="chart-wrap" style="height:260px"><canvas id="cDeltaBoth"></canvas></div>
-    </div>
-  </div>
-
-  <!-- ─── メンバーシップ セクション ─── -->
-  <div class="section-label">メンバーシップ</div>
-
-  <!-- 新規③: フォロワー数 vs メンバーシップ数（2軸） -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-hd">
-      <div class="card-title"><i class="ti ti-crown"></i>フォロワー数 vs メンバーシップ数</div>
-      <div class="tab-group" id="memRangeTabGroup">
-        <button class="tab active" data-range="all">ALL</button>
-        <button class="tab" data-range="90">90D</button>
-        <button class="tab" data-range="30">30D</button>
-      </div>
-    </div>
-    <div class="card-body">
-      <div id="memLegend" class="legend"></div>
-      <div class="chart-wrap" style="height:240px"><canvas id="cMem"></canvas></div>
     </div>
   </div>
 
@@ -342,7 +318,6 @@ let userData = [], articleData = [], charts = {};
 let currentRange      = 'all';
 let currentFFRange    = 'all';
 let currentDeltaRange = '14';
-let currentMemRange   = 'all';
 let currentSort       = 'PV';
 
 Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
@@ -439,7 +414,7 @@ async function init() {
         date:       parseD(c['日付']),
         followers:  num(c['フォロワー数']),
         following:  num(c['フォロー数']),
-        membership: num(c['メンバーシップ数']),
+        membership: num(c['メンバーシップ数']),  // 取得不可のため将来用に残す
         totalPV:    num(c['総PV(直近1年)']),
         totalLikes: num(c['総スキ数(直近1年)']),
         articles:   num(c['記事数'])
@@ -476,7 +451,6 @@ async function init() {
     drawDelta();
     drawFF();
     drawDeltaBoth();
-    drawMem();
     drawCumul();
     drawEng();
     drawArtPV();
@@ -499,7 +473,6 @@ function renderKPI() {
 
   document.getElementById('kFollowers').textContent  = fmt(last.followers);
   document.getElementById('kFollowing').textContent  = fmt(last.following);
-  document.getElementById('kMembership').textContent = fmt(last.membership);
   document.getElementById('kPV').textContent         = fmt(last.totalPV);
   document.getElementById('kLikes').textContent      = fmt(last.totalLikes);
   document.getElementById('kArticles').textContent   = fmt(last.articles);
@@ -624,30 +597,6 @@ function drawDeltaBoth() {
   });
 }
 
-/* ── 新規③: フォロワー数 vs メンバーシップ数（2軸折れ線） ── */
-function drawMem() {
-  const d       = rangedData(currentMemRange);
-  const hasData = d.some(r => r.membership != null && r.membership > 0);
-  document.getElementById('memLegend').innerHTML =
-    `<span class="legend-item"><span class="legend-dot" style="background:${ACCENT}"></span>フォロワー数（左軸）</span>` +
-    `<span class="legend-item"><span class="legend-dot" style="background:${PURPLE}"></span>メンバーシップ数（右軸）</span>` +
-    (!hasData ? '<span class="legend-item" style="color:var(--text-tertiary)">※ メンバーシップデータ未収集</span>' : '');
-
-  if (charts.mem) charts.mem.destroy();
-  charts.mem = new Chart(document.getElementById('cMem'), {
-    type: 'line',
-    data: { labels: d.map(r => fmtD(r.date).slice(5)), datasets: [
-      { label: 'フォロワー数',       data: d.map(r => r.followers),
-        borderColor: ACCENT, backgroundColor: ACCENT + '18',
-        borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: true, yAxisID: 'y' },
-      { label: 'メンバーシップ数', data: d.map(r => r.membership),
-        borderColor: PURPLE, backgroundColor: PURPLE + '18',
-        borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: false, yAxisID: 'y1' }
-    ]},
-    options: dualOpts('フォロワー数', 'メンバーシップ数')
-  });
-}
-
 /* ── 既存: 累計指標 ── */
 function drawCumul() {
   const filtered = userData.filter(r => r.totalPV != null);
@@ -760,7 +709,6 @@ function bindTabs(groupId, onSelect) {
 bindTabs('rangeTabGroup',    d => { currentRange      = d.range; drawFollower(); });
 bindTabs('ffRangeTabGroup',  d => { currentFFRange    = d.range; drawFF(); });
 bindTabs('deltaRangeTabGroup', d => { currentDeltaRange = d.range; drawDeltaBoth(); });
-bindTabs('memRangeTabGroup', d => { currentMemRange   = d.range; drawMem(); });
 bindTabs('sortTabGroup',     d => { currentSort       = d.sort;  renderRank(); });
 
 init();

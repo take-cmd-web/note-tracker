@@ -223,9 +223,9 @@
     <div class="card-hd">
       <div class="card-title"><i class="ti ti-activity"></i>前日比 · フォロワー / フォロー + 7日移動平均</div>
       <div class="tab-group" id="deltaRangeTabGroup">
-        <button class="tab active" data-range="60">60D</button>
+        <button class="tab active" data-range="14">14D</button>
         <button class="tab" data-range="30">30D</button>
-        <button class="tab" data-range="14">14D</button>
+        <button class="tab" data-range="60">60D</button>
       </div>
     </div>
     <div class="card-body">
@@ -341,7 +341,7 @@ const TEAL   = dark ? '#4DBDBD' : '#1A8A8A';
 let userData = [], articleData = [], charts = {};
 let currentRange      = 'all';
 let currentFFRange    = 'all';
-let currentDeltaRange = '60';
+let currentDeltaRange = '14';
 let currentMemRange   = 'all';
 let currentSort       = 'PV';
 
@@ -351,7 +351,13 @@ Chart.defaults.color       = tc;
 
 /* ── util ── */
 const fmt     = n => n == null || isNaN(n) ? '—' : Number(n).toLocaleString('ja-JP');
-const fmtD    = d => d ? d.toISOString().slice(0, 10) : '—';
+const fmtD    = d => {
+  if (!d) return '—';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 const parseD  = s => s ? new Date(s + 'T00:00:00') : null;
 const num     = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/,/g, '')); return isNaN(n) ? null : n; };
 const esc     = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -539,24 +545,24 @@ function drawDelta() {
   });
 }
 
-/* ── 新規①: フォロワー数 vs フォロー数（2軸折れ線） ── */
+/* ── 新規①: フォロワー数 vs フォロー数（単軸折れ線） ── */
 function drawFF() {
   const d = rangedData(currentFFRange);
   document.getElementById('ffLegend').innerHTML =
-    `<span class="legend-item"><span class="legend-dot" style="background:${ACCENT}"></span>フォロワー数（左軸）</span>` +
-    `<span class="legend-item"><span class="legend-dot" style="background:${TEAL}"></span>フォロー数（右軸）</span>`;
+    `<span class="legend-item"><span class="legend-dot" style="background:${ACCENT}"></span>フォロワー数</span>` +
+    `<span class="legend-item"><span class="legend-dot" style="background:${TEAL}"></span>フォロー数</span>`;
   if (charts.ff) charts.ff.destroy();
   charts.ff = new Chart(document.getElementById('cFF'), {
     type: 'line',
     data: { labels: d.map(r => fmtD(r.date).slice(5)), datasets: [
       { label: 'フォロワー数', data: d.map(r => r.followers),
         borderColor: ACCENT, backgroundColor: ACCENT + '18',
-        borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: true, yAxisID: 'y' },
+        borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: true },
       { label: 'フォロー数',   data: d.map(r => r.following),
         borderColor: TEAL,   backgroundColor: TEAL   + '18',
-        borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: true, yAxisID: 'y1' }
+        borderWidth: 2, pointRadius: d.length > 60 ? 0 : 3, tension: 0.3, fill: true }
     ]},
-    options: dualOpts('フォロワー数', 'フォロー数')
+    options: baseOpts()
   });
 }
 

@@ -102,12 +102,48 @@ def fetch_user_stats():
     url = f'https://note.com/api/v2/creators/{NOTE_USERNAME}'
     res = requests.get(url, headers=HEADERS)
     res.raise_for_status()
-    data = res.json().get('data', {})
-    # デバッグ: 全キーとmembership関連キーを出力
-    print(f'[DEBUG] userデータの全キー: {list(data.keys())}')
-    membership_keys = {k: v for k, v in data.items() if 'member' in k.lower()}
-    print(f'[DEBUG] membership関連キー: {membership_keys}')
-    return data
+    return res.json().get('data', {})
+
+
+def fetch_membership_count() -> int:
+    """メンバーシップ（Circle）の会員数を取得する"""
+    # パターン1: circle情報をcreatorから取得
+    try:
+        url = f'https://note.com/api/v2/creators/{NOTE_USERNAME}/circle'
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        print(f'[DEBUG] circle API status: {res.status_code}')
+        if res.status_code == 200:
+            data = res.json().get('data', {})
+            print(f'[DEBUG] circle data keys: {list(data.keys()) if isinstance(data, dict) else data}')
+            count = data.get('memberCount') or data.get('member_count') or data.get('subscriberCount')
+            if count is not None:
+                return int(count)
+    except Exception as e:
+        print(f'[DEBUG] circle API error: {e}')
+
+    # パターン2: circles endpoint
+    try:
+        url = f'https://note.com/api/v1/circles?creator_urlname={NOTE_USERNAME}'
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        print(f'[DEBUG] circles v1 API status: {res.status_code}')
+        if res.status_code == 200:
+            data = res.json()
+            print(f'[DEBUG] circles v1 data: {str(data)[:300]}')
+    except Exception as e:
+        print(f'[DEBUG] circles v1 API error: {e}')
+
+    # パターン3: membership endpoint
+    try:
+        url = f'https://note.com/api/v1/membership/plans?creator_urlname={NOTE_USERNAME}'
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        print(f'[DEBUG] membership plans API status: {res.status_code}')
+        if res.status_code == 200:
+            data = res.json()
+            print(f'[DEBUG] membership plans data: {str(data)[:300]}')
+    except Exception as e:
+        print(f'[DEBUG] membership plans API error: {e}')
+
+    return 0
 
 
 def fetch_char_count(key: str) -> int:
@@ -192,6 +228,9 @@ def main():
     articles, totals = fetch_pv_stats()
     publish_map = fetch_publish_dates()
 
+    print('メンバーシップ数を取得中...')
+    membership_count = fetch_membership_count()
+
     char_cache_csv = OUTPUT_DIR / 'char_cache.csv'
     print('文字数を取得中（キャッシュにない記事のみ）...')
     char_map = build_char_map(articles, char_cache_csv)
@@ -207,7 +246,7 @@ def main():
          totals['total_pv'],
          totals['total_like'],
          totals['total_comment'],
-         user.get('membershipCount', 0)]
+         membership_count]
     )
 
     article_csv = OUTPUT_DIR / 'article_stats.csv'

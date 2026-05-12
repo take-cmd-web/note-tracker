@@ -107,42 +107,17 @@ def fetch_user_stats():
 
 def fetch_membership_count() -> int:
     """メンバーシップ（Circle）の会員数を取得する"""
-    # パターン1: circle情報をcreatorから取得
     try:
         url = f'https://note.com/api/v2/creators/{NOTE_USERNAME}/circle'
         res = requests.get(url, headers=HEADERS, timeout=10)
-        print(f'[DEBUG] circle API status: {res.status_code}')
         if res.status_code == 200:
             data = res.json().get('data', {})
-            print(f'[DEBUG] circle data keys: {list(data.keys()) if isinstance(data, dict) else data}')
-            count = data.get('memberCount') or data.get('member_count') or data.get('subscriberCount')
-            if count is not None:
-                return int(count)
+            # subscriptionCount = 現在の有効会員数
+            count = data.get('subscriptionCount', 0)
+            print(f'メンバーシップ数: {count}（subscriptionCount）')
+            return int(count)
     except Exception as e:
-        print(f'[DEBUG] circle API error: {e}')
-
-    # パターン2: circles endpoint
-    try:
-        url = f'https://note.com/api/v1/circles?creator_urlname={NOTE_USERNAME}'
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        print(f'[DEBUG] circles v1 API status: {res.status_code}')
-        if res.status_code == 200:
-            data = res.json()
-            print(f'[DEBUG] circles v1 data: {str(data)[:300]}')
-    except Exception as e:
-        print(f'[DEBUG] circles v1 API error: {e}')
-
-    # パターン3: membership endpoint
-    try:
-        url = f'https://note.com/api/v1/membership/plans?creator_urlname={NOTE_USERNAME}'
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        print(f'[DEBUG] membership plans API status: {res.status_code}')
-        if res.status_code == 200:
-            data = res.json()
-            print(f'[DEBUG] membership plans data: {str(data)[:300]}')
-    except Exception as e:
-        print(f'[DEBUG] membership plans API error: {e}')
-
+        print(f'[ERROR] メンバーシップ取得失敗: {e}')
     return 0
 
 

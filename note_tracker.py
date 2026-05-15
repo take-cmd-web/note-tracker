@@ -250,24 +250,33 @@ def main():
     char_map = build_char_map(articles, char_cache_csv)
 
     user_csv = OUTPUT_DIR / 'user_stats.csv'
-    dedup_csv(user_csv)
-    if already_recorded(user_csv, today):
-        print(f'[スキップ] {today} はすでに user_stats.csv に記録済みです')
-    else:
-        append_to_csv(
-            user_csv,
-            ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)', 'メンバーシップ数'],
-            [today,
-             user.get('followerCount'),
-             user.get('followingCount'),
-             len(articles),
-             totals['total_pv'],
-             totals['total_like'],
-             totals['total_comment'],
-             membership_count]
-        )
+    append_to_csv(
+        user_csv,
+        ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)', 'メンバーシップ数'],
+        [today,
+         user.get('followerCount'),
+         user.get('followingCount'),
+         len(articles),
+         totals['total_pv'],
+         totals['total_like'],
+         totals['total_comment'],
+         membership_count]
+    )
+    dedup_csv(user_csv)  # 同日の古いデータを最新で上書き
 
     article_csv = OUTPUT_DIR / 'article_stats.csv'
+    # 今日分の記事データをいったん全削除してから書き直す（上書き）
+    if article_csv.exists():
+        with open(article_csv, newline='', encoding='utf-8-sig') as f:
+            rows = list(csv.reader(f))
+        header = rows[0] if rows else []
+        other_days = [r for r in rows[1:] if r and r[0] != today]
+        with open(article_csv, 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.writer(f)
+            if header:
+                writer.writerow(header)
+            writer.writerows(other_days)
+
     for a in articles:
         key = a.get('key')
         publish_date = publish_map.get(key, '')

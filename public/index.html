@@ -683,48 +683,35 @@ function drawDOW() {
   if (!articleData.length) return;
 
   const DOW_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  // 前日まで
   const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-  // 8週間前（前日の56日前）
-  const cutoff = new Date(yesterday); cutoff.setDate(cutoff.getDate() - 55); // 56日 = 8週
+  const cutoff    = new Date(yesterday); cutoff.setDate(cutoff.getDate() - 55); // 56日=8週
 
-  // articleData から前日までの8週間のデータを収集
-  // user_stats.csv の日次PVデータを使う（totalPVの差分ではなく、
-  // article_stats は公開日ベースなので user_stats の日次増分を使う）
-  // → userData の連続する日付間の totalPV 差分を曜日別に集計
-  const filtered = userData.filter(r => r.date >= cutoff && r.date <= yesterday);
-
-  // 曜日ごとにPV増分を集計
+  // 公開日が過去8週間（前日まで）の記事のPVを曜日別に集計
   const dowValues = [[], [], [], [], [], [], []]; // 0=日〜6=土
-  for (let i = 1; i < userData.length; i++) {
-    const cur  = userData[i];
-    const prev = userData[i - 1];
-    if (cur.date < cutoff || cur.date > yesterday) continue;
-    if (cur.totalPV == null || prev.totalPV == null) continue;
-    const diff = cur.totalPV - prev.totalPV;
-    if (diff < 0) continue; // リセット等の異常値を除外
-    const dow = cur.date.getDay(); // 0=日〜6=土
-    dowValues[dow].push(diff);
-  }
+  articleData.forEach(r => {
+    if (!r.publishDate) return;
+    if (r.publishDate < cutoff || r.publishDate > yesterday) return;
+    const dow = r.publishDate.getDay();
+    dowValues[dow].push(r.PV);
+  });
 
-  const avg = dowValues.map(arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
-  const max = dowValues.map(arr => arr.length ? Math.max(...arr) : 0);
-  const min = dowValues.map(arr => arr.length ? Math.min(...arr) : 0);
+  const avg = dowValues.map(arr =>
+    arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null
+  );
   const cnt = dowValues.map(arr => arr.length);
 
   document.getElementById('dowLegend').innerHTML =
-    `<span class="legend-item"><span class="legend-dot" style="background:${ACCENT}"></span>平均PV増分</span>` +
-    `<span class="legend-item"><span class="legend-line" style="background:${GREEN};height:3px"></span>最大</span>` +
-    `<span class="legend-item"><span class="legend-line" style="background:${RED};height:3px"></span>最小</span>` +
-    `<span class="legend-item" style="color:var(--text-tertiary);font-size:11px">※ 前日までの過去8週間の日次PV増分</span>`;
+    `<span class="legend-item"><span class="legend-dot" style="background:${ACCENT}"></span>平均PV（公開日ベース）</span>` +
+    `<span class="legend-item" style="color:var(--text-tertiary);font-size:11px">※ 前日までの過去8週間に公開した記事の平均PV</span>`;
 
   const opts = baseOpts();
   opts.scales.y.ticks = { callback: v => v.toLocaleString() };
   opts.plugins.tooltip.callbacks = {
-    title:  items => `${DOW_LABELS[items[0].dataIndex]}曜日（${cnt[items[0].dataIndex]}週分）`,
-    label:  item  => ` ${item.dataset.label}: ${typeof item.raw === 'number' ? Math.round(item.raw).toLocaleString() : '—'}`
+    title:  items => `${DOW_LABELS[items[0].dataIndex]}曜日（${cnt[items[0].dataIndex]}記事）`,
+    label:  item  => item.raw == null ? ' データなし' : ` 平均PV: ${Math.round(item.raw).toLocaleString()}`
   };
 
   if (charts.dow) charts.dow.destroy();
@@ -732,18 +719,13 @@ function drawDOW() {
     type: 'bar',
     data: {
       labels: DOW_LABELS,
-      datasets: [
-        { label: '平均PV増分', data: avg,
-          backgroundColor: DOW_LABELS.map((_, i) => i === 0 || i === 6 ? RED + '66' : ACCENT + '88'),
-          borderColor:      DOW_LABELS.map((_, i) => i === 0 || i === 6 ? RED      : ACCENT),
-          borderWidth: 1, order: 2 },
-        { label: '最大', data: max,
-          type: 'line', borderColor: GREEN, backgroundColor: 'transparent',
-          borderWidth: 2, pointRadius: 4, pointBackgroundColor: GREEN, tension: 0.3, order: 1 },
-        { label: '最小', data: min,
-          type: 'line', borderColor: RED, backgroundColor: 'transparent',
-          borderWidth: 2, pointRadius: 4, pointBackgroundColor: RED, tension: 0.3, order: 0 }
-      ]
+      datasets: [{
+        label: '平均PV',
+        data: avg,
+        backgroundColor: DOW_LABELS.map((_, i) => i === 0 || i === 6 ? RED + '66' : ACCENT + '88'),
+        borderColor:      DOW_LABELS.map((_, i) => i === 0 || i === 6 ? RED      : ACCENT),
+        borderWidth: 1
+      }]
     },
     options: opts
   });

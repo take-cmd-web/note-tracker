@@ -356,6 +356,8 @@ const signStr = n => n == null ? '—' : (n >= 0 ? `▲ +${n}` : `▼ ${n}`);
 
 const DOW_SHORT = ['日', '月', '火', '水', '木', '金', '土'];
 const fmtDow  = d => d ? `(${DOW_SHORT[d.getDay()]})` : '';
+
+function movingAvg(arr, w) {
   return arr.map((_, i) => {
     const s  = Math.max(0, i - w + 1);
     const sl = arr.slice(s, i + 1);

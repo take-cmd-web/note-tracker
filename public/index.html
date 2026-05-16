@@ -266,7 +266,7 @@
   <div class="card">
     <div class="card-hd">
       <div class="card-title"><i class="ti ti-calendar-week"></i>曜日別 PV（過去8週間・前日まで）</div>
-      <div class="card-meta">AVG / MAX / MIN · 8 WEEKS</div>
+      <div class="card-meta">AVG · 8 WEEKS</div>
     </div>
     <div class="card-body">
       <div id="dowLegend" class="legend"></div>
@@ -354,7 +354,8 @@ const fmtChar = n => {
 const signCls = n => n == null ? 'd-fl' : (n >= 0 ? 'd-up' : 'd-dn');
 const signStr = n => n == null ? '—' : (n >= 0 ? `▲ +${n}` : `▼ ${n}`);
 
-function movingAvg(arr, w) {
+const DOW_SHORT = ['日', '月', '火', '水', '木', '金', '土'];
+const fmtDow  = d => d ? `(${DOW_SHORT[d.getDay()]})` : '';
   return arr.map((_, i) => {
     const s  = Math.max(0, i - w + 1);
     const sl = arr.slice(s, i + 1);
@@ -741,7 +742,7 @@ function renderByDate() {
   document.querySelector('#tblByDate tbody').innerHTML = rows.map((r, i) => `<tr>
     <td class="rank">${String(i + 1).padStart(2, '0')}</td>
     <td class="art-title"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.title)}</a></td>
-    <td class="art-date">${fmtD(r.publishDate)}</td>
+    <td class="art-date">${fmtD(r.publishDate)}<span style="color:var(--text-tertiary);margin-left:4px">${r.publishDate ? '('+['日','月','火','水','木','金','土'][r.publishDate.getDay()]+')' : ''}</span></td>
     <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${(r.PV / maxPV) * 100}%;background:${ACCENT}"></div><div class="bar-txt accent-num">${fmt(r.PV)}</div></div></td>
     <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${maxLk > 0 ? (r['スキ数'] / maxLk) * 100 : 0}%;background:${AMBER}"></div><div class="bar-txt">${fmt(r['スキ数'])}</div></div></td>
     <td class="num num-r">${fmtChar(r['文字数'])}</td>
@@ -759,7 +760,7 @@ function renderRank() {
   document.querySelector('#tblRank tbody').innerHTML = rows.map((r, i) => `<tr>
     <td class="rank">${String(i + 1).padStart(2, '0')}</td>
     <td class="art-title"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.title)}</a></td>
-    <td class="art-date">${fmtD(r.publishDate)}</td>
+    <td class="art-date">${fmtD(r.publishDate)}<span style="color:var(--text-tertiary);margin-left:4px">${r.publishDate ? '('+['日','月','火','水','木','金','土'][r.publishDate.getDay()]+')' : ''}</span></td>
     <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${(r.PV / maxPV) * 100}%;background:${ACCENT}"></div><div class="bar-txt accent-num">${fmt(r.PV)}</div></div></td>
     <td class="num num-r"><div class="bar-wrap"><div class="bar-bg-inline" style="width:${maxLk > 0 ? (r['スキ数'] / maxLk) * 100 : 0}%;background:${AMBER}"></div><div class="bar-txt">${fmt(r['スキ数'])}</div></div></td>
     <td class="num num-r">${fmtChar(r['文字数'])}</td>

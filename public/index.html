@@ -443,8 +443,10 @@ async function init() {
     });
 
     const last = userData[userData.length - 1];
-    document.getElementById('updatedAt').textContent  = `更新: ${fmtD(last?.date)}`;
-    document.getElementById('footerTime').textContent = `generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+    const now  = new Date();
+    const nowStr = `${fmtD(now)} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('updatedAt').textContent  = `更新: ${fmtD(last?.date)} / 取得: ${nowStr}`;
+    document.getElementById('footerTime').textContent = `generated ${nowStr}`;
 
     renderKPI();
     drawFollower();
@@ -638,7 +640,11 @@ function drawArtPV() {
   const cut  = new Date(); cut.setDate(cut.getDate() - 60);
   const rows = articleData.filter(r => r.publishDate && r.publishDate >= cut).sort((a, b) => a.publishDate - b.publishDate);
   if (!rows.length) { document.getElementById('cArtPV').parentElement.innerHTML = '<div class="loading">直近2ヶ月に公開された記事がありません</div>'; return; }
-  const pvData = rows.map(r => r.PV), ma7 = movingAvg(pvData, 7), titles = rows.map(r => r.title);
+  const pvData = rows.map(r => r.PV);
+  const ma7raw = movingAvg(pvData, 7);
+  // 最新日（最終インデックス）のMAはnullにして非表示
+  const ma7 = ma7raw.map((v, i) => i === ma7raw.length - 1 ? null : v);
+  const titles = rows.map(r => r.title);
   const opts = dualOpts('PV', 'スキ', 20);
   opts.plugins.tooltip.callbacks = {
     title:  items => titles[items[0].dataIndex],

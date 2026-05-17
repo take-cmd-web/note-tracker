@@ -1,15 +1,24 @@
 import requests
 import csv
 import os
+import json
+import io
 import re
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+
 # ===== 環境変数から読み込み =====
 NOTE_USERNAME = os.environ['NOTE_USERNAME']
 COOKIE = os.environ['NOTE_COOKIE']
+
+GOOGLE_SERVICE_ACCOUNT_JSON = os.environ['GOOGLE_SERVICE_ACCOUNT_JSON']
+GOOGLE_DRIVE_FOLDER_ID = os.environ['GOOGLE_DRIVE_FOLDER_ID']
 
 OUTPUT_DIR = Path('./public')
 
@@ -20,22 +29,67 @@ HEADERS = {
     'Referer': 'https://note.com/sitesettings/stats',
 }
 
+DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive']
+
 
 # ──────────────────────────────────────────────
-# note API
+# Google Drive ヘルパー
+# ──────────────────────────────────────────────
+
+def build_drive_service():
+    info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+    creds = service_account.Credentials.from_service_account_info(info, scopes=DRIVE_SCOPES)
+    return build('drive', 'v3', credentials=creds)
+
+
+def get_or_create_file_id(service, filename: str, folder_id: str) -> str | None:
+    query = (
+        f"name = '{filename}' "
+        f"and '{folder_id}' in parents "
+        f"and mimeType = 'text/csv' "
+        f"and trashed = false"
+    )
+    result = service.files().list(q=query, fields='files(id, name)').execute()
+    files = result.get('files', [])
+    return files[0]['id'] if files else None
+
+
+def upload_csv_to_drive(service, local_path: Path, folder_id: str):
+    filename = local_path.name
+    content = local_path.read_bytes()
+    media = MediaIoBaseUpload(io.BytesIO(content), mimetype='text/csv', resumable=False)
+
+    file_id = get_or_create_file_id(service, filename, folder_id)
+
+    if file_id:
+        service.files().update(fileId=file_id, media_body=media).execute()
+        print(f'  [Drive] 更新: {filename} (id={file_id})')
+    else:
+        metadata = {'name': filename, 'parents': [folder_id]}
+        service.files().create(body=metadata, media_body=media, fields='id').execute()
+        print(f'  [Drive] 新規作成: {filename}')
+
+
+# ──────────────────────────────────────────────
+# note API（認証チェック付き）
 # ──────────────────────────────────────────────
 
 def check_auth():
-    """セッションCookieの有効性を確認する"""
-    url = 'https://note.com/api/v1/stats/pv?filter=yearly&page=1&sort=pv'
+    """
+    セッションCookieの有効性を確認する。
+    無効な場合はエラーメッセージを出して終了する。
+    """
+    url = f'https://note.com/api/v1/stats/pv?filter=yearly&page=1&sort=pv'
     res = requests.get(url, headers=HEADERS)
 
     if res.status_code == 401:
         print('::error::認証エラー（401）: NOTE_COOKIEが失効しています。GitHubのSecretsを更新してください。')
         sys.exit(1)
+
     if res.status_code == 403:
         print('::error::アクセス拒否（403）: NOTE_COOKIEが無効です。GitHubのSecretsを更新してください。')
         sys.exit(1)
+
     if res.status_code != 200:
         print(f'::error::APIエラー（{res.status_code}）: {res.text[:200]}')
         sys.exit(1)
@@ -105,27 +159,6 @@ def fetch_user_stats():
     return res.json().get('data', {})
 
 
-def fetch_membership_count() -> int:
-    """メンバーシップ（Circle）の会員数を取得する"""
-    try:
-        url = f'https://note.com/api/v2/creators/{NOTE_USERNAME}/circle'
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        if res.status_code != 200:
-            print(f'メンバーシップAPI: {res.status_code} → 0を記録')
-            return 0
-        data = res.json().get('data', {})
-        # 取得できる数値フィールドを順に試す
-        for key in ['subscriptionCount', 'memberCount', 'membershipNumber', 'totalMemberCount']:
-            val = data.get(key)
-            if val is not None and int(val) > 0:
-                print(f'メンバーシップ数: {val}（{key}）')
-                return int(val)
-        print('メンバーシップ数: 取得できず → 0を記録')
-    except Exception as e:
-        print(f'[ERROR] メンバーシップ取得失敗: {e}')
-    return 0
-
-
 def fetch_char_count(key: str) -> int:
     try:
         url = f'https://note.com/api/v3/notes/{key}'
@@ -184,40 +217,6 @@ def build_char_map(articles: list, cache_path: Path) -> dict:
     return cache
 
 
-def dedup_csv(filepath: Path):
-    """同一日付の重複行を除去し、各日付の最終行だけ残す"""
-    if not filepath.exists():
-        return
-    with open(filepath, newline='', encoding='utf-8-sig') as f:
-        reader = csv.reader(f)
-        rows = list(reader)
-    if len(rows) <= 1:
-        return
-    header = rows[0]
-    seen = {}
-    for row in rows[1:]:
-        if row:
-            seen[row[0]] = row
-    with open(filepath, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.writer(f)
-        writer.writerow(header)
-        writer.writerows(seen.values())
-    print(f'[重複除去] {filepath}: {len(rows)-1}行 → {len(seen)}行')
-
-
-def already_recorded(filepath: Path, today: str) -> bool:
-    """今日の日付がすでにCSVに記録済みかチェックする"""
-    if not filepath.exists():
-        return False
-    with open(filepath, newline='', encoding='utf-8-sig') as f:
-        reader = csv.reader(f)
-        next(reader, None)  # ヘッダースキップ
-        for row in reader:
-            if row and row[0] == today:
-                return True
-    return False
-
-
 def append_to_csv(filepath, headers, row):
     file_exists = filepath.exists()
     with open(filepath, 'a', newline='', encoding='utf-8-sig') as f:
@@ -235,15 +234,13 @@ def main():
     OUTPUT_DIR.mkdir(exist_ok=True)
     today = datetime.now().strftime('%Y-%m-%d')
 
+    # 最初に認証チェック（失効していればここで終了）
     print('認証チェック中...')
     check_auth()
 
     user = fetch_user_stats()
     articles, totals = fetch_pv_stats()
     publish_map = fetch_publish_dates()
-
-    print('メンバーシップ数を取得中...')
-    membership_count = fetch_membership_count()
 
     char_cache_csv = OUTPUT_DIR / 'char_cache.csv'
     print('文字数を取得中（キャッシュにない記事のみ）...')
@@ -252,31 +249,17 @@ def main():
     user_csv = OUTPUT_DIR / 'user_stats.csv'
     append_to_csv(
         user_csv,
-        ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)', 'メンバーシップ数'],
+        ['日付', 'フォロワー数', 'フォロー数', '記事数', '総PV(直近1年)', '総スキ数(直近1年)', '総コメント数(直近1年)'],
         [today,
          user.get('followerCount'),
          user.get('followingCount'),
          len(articles),
          totals['total_pv'],
          totals['total_like'],
-         totals['total_comment'],
-         membership_count]
+         totals['total_comment']]
     )
-    dedup_csv(user_csv)  # 同日の古いデータを最新で上書き
 
     article_csv = OUTPUT_DIR / 'article_stats.csv'
-    # 今日分の記事データをいったん全削除してから書き直す（上書き）
-    if article_csv.exists():
-        with open(article_csv, newline='', encoding='utf-8-sig') as f:
-            rows = list(csv.reader(f))
-        header = rows[0] if rows else []
-        other_days = [r for r in rows[1:] if r and r[0] != today]
-        with open(article_csv, 'w', newline='', encoding='utf-8-sig') as f:
-            writer = csv.writer(f)
-            if header:
-                writer.writerow(header)
-            writer.writerows(other_days)
-
     for a in articles:
         key = a.get('key')
         publish_date = publish_map.get(key, '')
@@ -295,6 +278,12 @@ def main():
         )
 
     print(f'[{today}] 記録完了：{len(articles)}記事、総PV {totals["total_pv"]}、総スキ {totals["total_like"]}')
+
+    print('Google Drive へアップロード中...')
+    drive = build_drive_service()
+    for csv_path in [user_csv, article_csv, char_cache_csv]:
+        upload_csv_to_drive(drive, csv_path, GOOGLE_DRIVE_FOLDER_ID)
+    print('アップロード完了')
 
 
 if __name__ == '__main__':

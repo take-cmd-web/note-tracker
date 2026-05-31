@@ -38,6 +38,16 @@ jobs:
             git push
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
+      - name: Purge Cloudflare Cache
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          curl -X POST "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/note-tracker/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything": true}'
       - name: Warn if no data change
         if: steps.commit.outputs.changed == 'false'
         run: |

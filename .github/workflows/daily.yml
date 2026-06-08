@@ -1,11 +1,22 @@
 name: Daily Note Stats
 on:
   schedule:
-    # 毎日 日本時間 10:00 (UTC 01:00) に実行
+    # 日本時間 04:00 (UTC 19:00 前日)
+    - cron: '0 19 * * *'
+    # 日本時間 07:00 (UTC 22:00 前日)
+    - cron: '0 22 * * *'
+    # 日本時間 10:00 (UTC 01:00)
     - cron: '0 1 * * *'
-    # 毎日 日本時間 18:00 (UTC 09:00) に実行
-    - cron: '0 9 * * *'
+    # 日本時間 13:00 (UTC 04:00)
+    - cron: '0 4 * * *'
+    # 日本時間 16:00 (UTC 07:00)
+    - cron: '0 7 * * *'
+    # 日本時間 19:00 (UTC 10:00)
+    - cron: '0 10 * * *'
+    # 日本時間 22:00 (UTC 13:00)
+    - cron: '0 13 * * *'
   workflow_dispatch:  # 手動実行も可能にする
+
 jobs:
   track:
     runs-on: ubuntu-latest

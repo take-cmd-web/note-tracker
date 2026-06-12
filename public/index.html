@@ -588,6 +588,16 @@ function drawDeltaBoth() {
     }
   };
 
+  // 下限を-20に固定、上限は可変（プラス側の実データが上回れば自動で伸びる）
+  opts.scales.y.min = -20;
+  opts.scales.y.suggestedMax = Math.max(
+    10,
+    ...dFol.map(v  => v  ?? 0),
+    ...dFing.map(v => v ?? 0),
+    ...ma7Fol,
+    ...ma7Fing
+  );
+
   if (charts.db) charts.db.destroy();
   charts.db = new Chart(document.getElementById('cDeltaBoth'), {
     type: 'bar',
